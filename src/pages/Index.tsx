@@ -1,0 +1,138 @@
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Header } from "@/components/Header";
+import { ThemeProvider } from "next-themes";
+import { Badge } from "@/components/ui/badge";
+import { Zap, Shield, Download, Sparkles, Check } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { lazy, Suspense, memo } from "react";
+
+// Lazy load converter components for better initial load
+const CsvToJsonConverter = lazy(() => import("@/components/CsvToJsonConverter").then(m => ({ default: m.CsvToJsonConverter })));
+const JsonToCsvConverter = lazy(() => import("@/components/JsonToCsvConverter").then(m => ({ default: m.JsonToCsvConverter })));
+const AutoDetectConverter = lazy(() => import("@/components/AutoDetectConverter").then(m => ({ default: m.AutoDetectConverter })));
+const JsonBeautifier = lazy(() => import("@/components/JsonBeautifier").then(m => ({ default: m.JsonBeautifier })));
+
+// Loading spinner for lazy components
+const ConverterLoader = () => (
+  <div className="flex items-center justify-center min-h-[400px]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
+
+// Memoize feature card to prevent re-renders
+const FeatureCard = memo(({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
+  <Card className="border-primary/20">
+    <CardContent className="pt-6 pb-4">
+      <Icon className="h-8 w-8 mx-auto mb-2 text-primary" />
+      <h3 className="font-semibold mb-1">{title}</h3>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </CardContent>
+  </Card>
+));
+
+FeatureCard.displayName = "FeatureCard";
+
+// Memoize benefit item
+const BenefitItem = memo(({ title, description }: { title: string, description: string }) => (
+  <div className="flex gap-3">
+    <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+    <div>
+      <h3 className="font-semibold mb-1">{title}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
+    </div>
+  </div>
+));
+
+BenefitItem.displayName = "BenefitItem";
+
+const Index = () => {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <div className="min-h-screen bg-background">
+        <Header />
+        
+        <main className="container mx-auto px-4 pb-8 pt-16">
+          <Tabs defaultValue="auto-detect" className="w-full">
+            <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-4 mb-8">
+              <TabsTrigger value="auto-detect" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Auto-Detect
+              </TabsTrigger>
+              <TabsTrigger value="csv-to-json">CSV → JSON</TabsTrigger>
+              <TabsTrigger value="json-to-csv">JSON → CSV</TabsTrigger>
+              <TabsTrigger value="json-tools">JSON Tools</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="auto-detect" className="space-y-4">
+              <Suspense fallback={<ConverterLoader />}>
+                <AutoDetectConverter />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="csv-to-json" className="space-y-4">
+              <Suspense fallback={<ConverterLoader />}>
+                <CsvToJsonConverter />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="json-to-csv" className="space-y-4">
+              <Suspense fallback={<ConverterLoader />}>
+                <JsonToCsvConverter />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="json-tools" className="space-y-4">
+              <Suspense fallback={<ConverterLoader />}>
+                <JsonBeautifier />
+              </Suspense>
+            </TabsContent>
+          </Tabs>
+
+          {/* Features List */}
+          <section className="mt-16 max-w-3xl mx-auto">
+            <h2 className="text-2xl font-bold text-center mb-8">Why Choose DataMorph?</h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              <BenefitItem 
+                title="No Account Required" 
+                description="Start converting immediately without signing up" 
+              />
+              <BenefitItem 
+                title="Smart Auto-Detection" 
+                description="Automatically detects your data format" 
+              />
+              <BenefitItem 
+                title="Drag & Drop Support" 
+                description="Simply drag files to convert them" 
+              />
+              <BenefitItem 
+                title="JSON Beautifier" 
+                description="Format and validate JSON instantly" 
+              />
+              <BenefitItem 
+                title="Handles Complex Data" 
+                description="Nested objects, arrays, and special characters" 
+              />
+              <BenefitItem 
+                title="Works Offline" 
+                description="All processing happens in your browser" 
+              />
+            </div>
+          </section>
+        </main>
+
+        <footer className="border-t border-border mt-16 py-6">
+          <div className="container mx-auto px-4 text-center">
+            <p className="text-sm text-muted-foreground mb-2">
+              Made with ❤️ for fast data conversion
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Open source • Privacy first • No data collection
+            </p>
+          </div>
+        </footer>
+      </div>
+    </ThemeProvider>
+  );
+};
+
+export default Index;
