@@ -2,7 +2,7 @@ import { useState, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { ConverterPanel } from "./ConverterPanel";
-import { jsonToCsv, downloadFile } from "@/lib/converters";
+import { jsonToCsv, downloadFile, repairJson } from "@/lib/converters";
 import { logConversion } from "@/lib/supabaseLogger";
 import { toast } from "sonner";
 
@@ -59,14 +59,41 @@ export const JsonToCsvConverter = memo(() => {
     toast.success("File downloaded!");
   };
 
+  const handleRepair = useCallback(() => {
+    const result = repairJson(input);
+    if (result.success && result.data) {
+      setInput(result.data);
+      toast.success("JSON repaired successfully!");
+    } else {
+      toast.error(result.error || "Failed to repair JSON");
+    }
+  }, [input]);
+
+  const isJsonInput = useCallback(() => {
+    if (!input.trim()) return false;
+    const trimmed = input.trim();
+    return (trimmed.startsWith('{') || trimmed.startsWith('['));
+  }, [input]);
+
   return (
-    <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-240px)]">
-      <ConverterPanel
-        label="Input JSON"
-        value={input}
-        onChange={setInput}
-        placeholder={JSON_EXAMPLE}
-      />
+    <div className="space-y-4">
+      <div className="text-center mb-6 min-h-[80px] flex flex-col items-center justify-center">
+        <h2 className="text-xl font-semibold mb-2">JSON to CSV Converter</h2>
+        <p className="text-sm text-muted-foreground">
+          Convert JSON data into CSV format with intelligent flattening
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-320px)]">
+        <ConverterPanel
+          label="Input JSON"
+          value={input}
+          onChange={setInput}
+          placeholder={JSON_EXAMPLE}
+          showRepair={true}
+          repairEnabled={isJsonInput()}
+          onRepair={handleRepair}
+        />
 
       <div className="flex items-center justify-center">
         <Button
@@ -91,6 +118,7 @@ export const JsonToCsvConverter = memo(() => {
         placeholder="CSV output will appear here..."
         onDownload={handleDownload}
       />
+      </div>
     </div>
   );
 });

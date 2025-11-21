@@ -81,15 +81,23 @@ export const CsvToJsonConverter = memo(() => {
   }, [originalOutput]);
 
   return (
-    <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-240px)]">
-      <ConverterPanel
-        label="Input CSV"
-        value={input}
-        onChange={setInput}
-        placeholder={CSV_EXAMPLE}
-        allowFileUpload={true}
-        acceptedFileTypes=".csv,text/csv"
-      />
+    <div className="space-y-4">
+      <div className="text-center mb-6 min-h-[80px] flex flex-col items-center justify-center">
+        <h2 className="text-xl font-semibold mb-2">CSV to JSON Converter</h2>
+        <p className="text-sm text-muted-foreground">
+          Transform your CSV data into JSON format
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-320px)]">
+        <ConverterPanel
+          label="Input CSV"
+          value={input}
+          onChange={setInput}
+          placeholder={CSV_EXAMPLE}
+          allowFileUpload={true}
+          acceptedFileTypes=".csv,text/csv"
+        />
 
       <div className="flex items-center justify-center">
         <Button
@@ -118,6 +126,7 @@ export const CsvToJsonConverter = memo(() => {
         onMinify={handleMinify}
         onReset={handleReset}
       />
+      </div>
     </div>
   );
 });

@@ -1,9 +1,15 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Download, Upload, Minimize2, RotateCcw } from "lucide-react";
+import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ConverterPanelProps {
   label: string;
@@ -19,6 +25,9 @@ interface ConverterPanelProps {
   showReset?: boolean;
   onMinify?: () => void;
   onReset?: () => void;
+  showRepair?: boolean;
+  repairEnabled?: boolean;
+  onRepair?: () => void;
 }
 
 export const ConverterPanel = ({
@@ -35,6 +44,9 @@ export const ConverterPanel = ({
   showReset = false,
   onMinify,
   onReset,
+  showRepair = false,
+  repairEnabled = true,
+  onRepair,
 }: ConverterPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -115,6 +127,29 @@ export const ConverterPanel = ({
               </Button>
             </>
           )}
+          {showRepair && onRepair && !readOnly && (
+            <TooltipProvider>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <span className="inline-block">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={onRepair}
+                      disabled={!repairEnabled}
+                      className="gap-2"
+                    >
+                      <Wrench className="h-4 w-4" />
+                      Repair
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">{repairEnabled ? "Fix broken JSON" : "Input JSON required"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {readOnly && value && (
             <>
               {showMinify && onMinify && (
@@ -167,8 +202,8 @@ export const ConverterPanel = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex-1 relative ${
-          isDragging ? "ring-2 ring-primary ring-offset-2 rounded-md" : ""
+        className={`flex-1 relative overflow-hidden rounded-md ${
+          isDragging ? "ring-2 ring-primary ring-offset-2" : ""
         }`}
       >
         <Textarea
@@ -176,7 +211,7 @@ export const ConverterPanel = ({
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
           readOnly={readOnly}
-          className="h-full font-mono text-sm resize-none"
+          className="h-full w-full font-mono text-sm resize-none overflow-auto"
         />
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm rounded-md flex items-center justify-center pointer-events-none">

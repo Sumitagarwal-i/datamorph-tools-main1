@@ -56,9 +56,9 @@ const Index = () => {
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-b border-primary/20">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center gap-2 text-sm">
-              <Minimize2 className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="text-lg">🔥</span>
               <p>
-                <span className="font-semibold">New Feature:</span> You can now minify JSON output right away as part of your workflow! 🎉
+                <span className="font-semibold">Just Dropped: 1-Click JSON Fix</span> — Broken JSON? Missing commas? Bad quotes? We fix it all instantly.
               </p>
             </div>
           </div>
@@ -66,7 +66,7 @@ const Index = () => {
         
         <main className="container mx-auto px-4 pb-8 pt-16">
           <Tabs defaultValue="auto-detect" className="w-full">
-            <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-4 mb-8">
+            <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-4 mb-8 bg-muted/60 dark:bg-muted/30 backdrop-blur-md border border-border/50">
               <TabsTrigger value="auto-detect" className="gap-2">
                 <Sparkles className="h-4 w-4" />
                 Auto-Detect
@@ -114,6 +114,18 @@ const Index = () => {
                 description="Automatically detects your data format" 
               />
               <BenefitItem 
+                title="1-Click JSON Repair" 
+                description="Automatically fix broken JSON with missing commas, quotes, or brackets" 
+              />
+              <BenefitItem 
+                title="Instant JSON Minification" 
+                description="Minify JSON output directly in your workflow" 
+              />
+              <BenefitItem 
+                title="Smart Nested JSON to CSV" 
+                description="Intelligently flattens complex nested structures into proper CSV rows" 
+              />
+              <BenefitItem 
                 title="Drag & Drop Support" 
                 description="Simply drag files to convert them" 
               />
@@ -126,8 +138,12 @@ const Index = () => {
                 description="Nested objects, arrays, and special characters" 
               />
               <BenefitItem 
+                title="100% Private & Secure" 
+                description="All processing happens in your browser, no data sent to servers" 
+              />
+              <BenefitItem 
                 title="Works Offline" 
-                description="All processing happens in your browser" 
+                description="No internet required after initial load" 
               />
             </div>
           </section>
@@ -139,7 +155,7 @@ const Index = () => {
               Made with ❤️ for fast data conversion
             </p>
             <p className="text-xs text-muted-foreground">
-              Open source • Privacy first • No data collection
+              • Privacy first • No data collection
             </p>
           </div>
         </footer>

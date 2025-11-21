@@ -78,60 +78,106 @@ export const csvToJson = (csvText: string): ConversionResult => {
   }
 };
 
+// Helper function to flatten nested JSON into rows
+const flattenNestedJSON = (data: any, parentKey: string = ''): any[] => {
+  const rows: any[] = [];
+
+  if (Array.isArray(data)) {
+    // If it's an array of objects, flatten each item
+    data.forEach(item => {
+      if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+        // Add parent key as a column if exists
+        const flatItem = parentKey ? { category: parentKey, ...item } : item;
+        rows.push(flatItem);
+      }
+    });
+  } else if (typeof data === 'object' && data !== null) {
+    // If it's an object with nested arrays, flatten recursively
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+      if (Array.isArray(value)) {
+        // Recursively flatten with the key as parent category
+        const nestedRows = flattenNestedJSON(value, key);
+        rows.push(...nestedRows);
+      } else if (typeof value === 'object' && value !== null) {
+        // Handle nested objects
+        const nestedRows = flattenNestedJSON(value, key);
+        rows.push(...nestedRows);
+      }
+    });
+  }
+
+  return rows;
+};
+
 export const jsonToCsv = (jsonText: string): ConversionResult => {
   try {
     if (!jsonText.trim()) {
       return { success: false, error: "Please enter JSON data" };
     }
 
-    const jsonData = JSON.parse(jsonText);
+    let jsonData = JSON.parse(jsonText);
+    let flattenedData: any[] = [];
 
-    if (!Array.isArray(jsonData)) {
+    // Try to intelligently flatten the JSON structure
+    if (Array.isArray(jsonData)) {
+      // If it's already an array of objects, use it directly
+      flattenedData = jsonData.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          // Flatten any nested objects within the array items
+          const flatItem: Record<string, any> = {};
+          Object.keys(item).forEach(key => {
+            const value = item[key];
+            if (Array.isArray(value)) {
+              flatItem[key] = JSON.stringify(value);
+            } else if (typeof value === 'object' && value !== null) {
+              flatItem[key] = JSON.stringify(value);
+            } else {
+              flatItem[key] = value;
+            }
+          });
+          return flatItem;
+        }
+        return item;
+      });
+    } else if (typeof jsonData === 'object' && jsonData !== null) {
+      // Try to flatten nested structure intelligently
+      flattenedData = flattenNestedJSON(jsonData);
+      
+      // If no rows were created (flat object), wrap in array
+      if (flattenedData.length === 0) {
+        flattenedData = [jsonData];
+      }
+    } else {
       return {
         success: false,
-        error: "JSON must be an array of objects. Example: [{\"name\":\"John\",\"age\":30}]",
+        error: "JSON must be an object or array of objects. Example: [{\"name\":\"John\",\"age\":30}]",
       };
     }
 
-    if (jsonData.length === 0) {
-      return { success: false, error: "JSON array is empty" };
+    if (flattenedData.length === 0) {
+      return { success: false, error: "No data to convert" };
     }
 
-    // Collect all unique keys across all objects
+    // Ensure all objects have consistent keys
     const allKeys = new Set<string>();
-    jsonData.forEach(item => {
+    flattenedData.forEach(item => {
       if (typeof item === 'object' && item !== null) {
         Object.keys(item).forEach(key => allKeys.add(key));
       }
     });
 
-    // Flatten nested objects and handle missing keys
-    const flattenedData = jsonData.map(item => {
-      const flatItem: Record<string, any> = {};
-      
+    // Normalize all rows to have the same keys
+    const normalizedData = flattenedData.map(item => {
+      const normalized: Record<string, any> = {};
       allKeys.forEach(key => {
-        if (item && typeof item === 'object' && key in item) {
-          const value = item[key];
-          
-          // Handle nested objects by converting to JSON string (best for conversion back)
-          if (value && typeof value === 'object' && !Array.isArray(value)) {
-            flatItem[key] = JSON.stringify(value);
-          } else if (Array.isArray(value)) {
-            // Store arrays as JSON strings for proper roundtrip conversion
-            flatItem[key] = JSON.stringify(value);
-          } else {
-            flatItem[key] = value;
-          }
-        } else {
-          flatItem[key] = ''; // Fill missing keys with empty string
-        }
+        normalized[key] = item && typeof item === 'object' && key in item ? item[key] : '';
       });
-      
-      return flatItem;
+      return normalized;
     });
 
-    const csv = Papa.unparse(flattenedData, {
-      quotes: false, // Let Papa handle quoting intelligently (only when needed)
+    const csv = Papa.unparse(normalizedData, {
+      quotes: false,
       quoteChar: '"',
       escapeChar: '"',
       header: true,
@@ -140,7 +186,7 @@ export const jsonToCsv = (jsonText: string): ConversionResult => {
     return {
       success: true,
       data: csv,
-      itemCount: jsonData.length,
+      itemCount: flattenedData.length,
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -247,6 +293,134 @@ export const minifyJson = (jsonText: string): ConversionResult => {
         error: `Invalid JSON: ${error.message}`,
       };
     }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+};
+
+export const repairJson = (jsonText: string): ConversionResult => {
+  try {
+    if (!jsonText.trim()) {
+      return { success: false, error: "Please enter JSON data" };
+    }
+
+    let text = jsonText.trim();
+
+    // First, try parsing as-is
+    try {
+      const parsed = JSON.parse(text);
+      return {
+        success: true,
+        data: JSON.stringify(parsed, null, 2),
+      };
+    } catch {
+      // Continue with repair attempts
+    }
+
+    // Remove BOM and invisible characters
+    text = text.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+    // Fix common quote issues
+    // Replace smart quotes with regular quotes
+    text = text.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    
+    // Fix single quotes to double quotes for keys and string values
+    text = text.replace(/(\w+):\s*'([^']*)'/g, '"$1": "$2"');
+    text = text.replace(/:\s*'([^']*)'/g, ': "$1"');
+    
+    // Add quotes to unquoted keys
+    text = text.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+
+    // Fix trailing commas before closing brackets/braces
+    text = text.replace(/,(\s*[}\]])/g, '$1');
+
+    // Fix missing commas between elements
+    text = text.replace(/"\s*\n\s*"/g, '",\n"');
+    text = text.replace(/}(\s*){/g, '},\n{');
+    text = text.replace(/](\s*)\[/g, '],\n[');
+    text = text.replace(/}(\s*)\[/g, '},\n[');
+    text = text.replace(/](\s*){/g, '],\n{');
+    
+    // Fix missing commas after values
+    text = text.replace(/(\d+|true|false|null)(\s+)"([^"]+)":/g, '$1,\n"$3":');
+    text = text.replace(/"([^"]*)"(\s+)"([^"]+)":/g, '"$1",\n"$3":');
+
+    // Fix concatenated values without commas
+    text = text.replace(/"([^"]*)"(\s*)"([^"]*)"/g, '"$1", "$3"');
+
+    // Balance brackets and braces
+    const openBraces = (text.match(/{/g) || []).length;
+    const closeBraces = (text.match(/}/g) || []).length;
+    const openBrackets = (text.match(/\[/g) || []).length;
+    const closeBrackets = (text.match(/]/g) || []).length;
+
+    // Add missing closing brackets/braces
+    if (openBraces > closeBraces) {
+      text += '\n' + '}'.repeat(openBraces - closeBraces);
+    }
+    if (openBrackets > closeBrackets) {
+      text += '\n' + ']'.repeat(openBrackets - closeBrackets);
+    }
+
+    // Remove extra closing brackets/braces
+    if (closeBraces > openBraces) {
+      let count = closeBraces - openBraces;
+      text = text.replace(/}/g, (match) => {
+        if (count > 0) {
+          count--;
+          return '';
+        }
+        return match;
+      });
+    }
+    if (closeBrackets > openBrackets) {
+      let count = closeBrackets - openBrackets;
+      text = text.replace(/]/g, (match) => {
+        if (count > 0) {
+          count--;
+          return '';
+        }
+        return match;
+      });
+    }
+
+    // Fix escape sequences
+    text = text.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+
+    // Remove trailing commas (again, after all modifications)
+    text = text.replace(/,(\s*[}\]])/g, '$1');
+
+    // Try parsing after repairs
+    try {
+      const parsed = JSON.parse(text);
+      return {
+        success: true,
+        data: JSON.stringify(parsed, null, 2),
+      };
+    } catch (finalError) {
+      // If still failing, try one more aggressive repair
+      // Wrap in array if it looks like multiple objects
+      if (text.includes('}{')) {
+        text = '[' + text.replace(/}\s*{/g, '},\n{') + ']';
+        try {
+          const parsed = JSON.parse(text);
+          return {
+            success: true,
+            data: JSON.stringify(parsed, null, 2),
+          };
+        } catch {
+          // Fall through to error
+        }
+      }
+
+      return {
+        success: false,
+        error: finalError instanceof Error ? `Could not repair JSON: ${finalError.message}` : "Unable to repair JSON",
+      };
+    }
+  } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error occurred",

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { ConverterPanel } from "./ConverterPanel";
-import { beautifyJson, minifyJson, downloadFile } from "@/lib/converters";
+import { beautifyJson, minifyJson, downloadFile, repairJson } from "@/lib/converters";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -73,6 +73,25 @@ export const JsonBeautifier = () => {
     setIsProcessing(false);
   };
 
+  const handleRepair = async () => {
+    setIsProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const result = repairJson(input);
+    if (result.success && result.data) {
+      setOutput(result.data);
+      toast.success("JSON repaired successfully!");
+      // Also update validation
+      setIsValid(true);
+      setValidationMessage("Valid JSON ✓ (Repaired)");
+    } else {
+      toast.error(result.error || "Failed to repair JSON");
+      setOutput("");
+    }
+
+    setIsProcessing(false);
+  };
+
   const handleDownload = () => {
     downloadFile(output, "formatted.json");
     toast.success("File downloaded!");
@@ -80,7 +99,7 @@ export const JsonBeautifier = () => {
 
   return (
     <div className="space-y-4">
-      <div className="text-center mb-6">
+      <div className="text-center mb-6 min-h-[80px] flex flex-col items-center justify-center">
         <h2 className="text-xl font-semibold mb-2">JSON Beautifier & Validator</h2>
         <p className="text-sm text-muted-foreground">
           Format, validate, and minify JSON data instantly
@@ -88,14 +107,14 @@ export const JsonBeautifier = () => {
       </div>
 
       {isValid !== null && (
-        <Alert variant={isValid ? "default" : "destructive"} className="mb-4">
+        <Alert variant={isValid ? "default" : "destructive"} className="py-1 px-3 mb-2">
           <div className="flex items-center gap-2">
             {isValid ? (
-              <CheckCircle2 className="h-4 w-4" />
+              <CheckCircle2 className="h-3 w-3" />
             ) : (
-              <XCircle className="h-4 w-4" />
+              <XCircle className="h-3 w-3" />
             )}
-            <AlertDescription>{validationMessage}</AlertDescription>
+            <AlertDescription className="text-xs">{validationMessage}</AlertDescription>
           </div>
         </Alert>
       )}
@@ -134,6 +153,19 @@ export const JsonBeautifier = () => {
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               "Minify"
+            )}
+          </Button>
+          <Button
+            onClick={handleRepair}
+            disabled={!input.trim() || isProcessing}
+            className="gap-2 w-32"
+            variant="secondary"
+            size="lg"
+          >
+            {isProcessing ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              "Repair"
             )}
           </Button>
         </div>

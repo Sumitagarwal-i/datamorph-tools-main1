@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Sparkles, Minimize2, RotateCcw } from "lucide-react";
 import { ConverterPanel } from "./ConverterPanel";
-import { csvToJson, jsonToCsv, detectFormat, downloadFile } from "@/lib/converters";
+import { csvToJson, jsonToCsv, detectFormat, downloadFile, repairJson } from "@/lib/converters";
 import { logConversion } from "@/lib/supabaseLogger";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -103,9 +103,25 @@ export const AutoDetectConverter = () => {
     toast.success("Reset to original format");
   };
 
+  const handleRepair = () => {
+    const result = repairJson(input);
+    if (result.success && result.data) {
+      setInput(result.data);
+      toast.success("JSON repaired successfully!");
+    } else {
+      toast.error(result.error || "Failed to repair JSON");
+    }
+  };
+
+  const isJsonInput = () => {
+    if (!input.trim()) return false;
+    const trimmed = input.trim();
+    return (trimmed.startsWith('{') || trimmed.startsWith('['));
+  };
+
   return (
     <div className="space-y-4">
-      <div className="text-center mb-6">
+      <div className="text-center mb-6 min-h-[80px] flex flex-col items-center justify-center">
         <div className="flex items-center justify-center gap-2 mb-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold">Smart Auto-Detect</h2>
@@ -123,6 +139,9 @@ export const AutoDetectConverter = () => {
           placeholder="Paste CSV or JSON data here..."
           allowFileUpload={true}
           acceptedFileTypes=".csv,.json,text/csv,application/json"
+          showRepair={true}
+          repairEnabled={isJsonInput()}
+          onRepair={handleRepair}
         />
 
         <div className="flex items-center justify-center flex-col gap-3">
