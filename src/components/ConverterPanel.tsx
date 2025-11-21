@@ -1,7 +1,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Download, Upload } from "lucide-react";
+import { Copy, Download, Upload, Minimize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
 
@@ -15,6 +15,10 @@ interface ConverterPanelProps {
   onDownload?: () => void;
   allowFileUpload?: boolean;
   acceptedFileTypes?: string;
+  showMinify?: boolean;
+  showReset?: boolean;
+  onMinify?: () => void;
+  onReset?: () => void;
 }
 
 export const ConverterPanel = ({
@@ -27,6 +31,10 @@ export const ConverterPanel = ({
   onDownload,
   allowFileUpload = false,
   acceptedFileTypes = "*",
+  showMinify = false,
+  showReset = false,
+  onMinify,
+  onReset,
 }: ConverterPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -109,6 +117,28 @@ export const ConverterPanel = ({
           )}
           {readOnly && value && (
             <>
+              {showMinify && onMinify && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onMinify}
+                  className="gap-2"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                  Minify
+                </Button>
+              )}
+              {showReset && onReset && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onReset}
+                  className="gap-2"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"

@@ -1,6 +1,6 @@
 import { useState, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Minimize2, RotateCcw } from "lucide-react";
 import { ConverterPanel } from "./ConverterPanel";
 import { csvToJson, downloadFile } from "@/lib/converters";
 import { logConversion } from "@/lib/supabaseLogger";
@@ -15,6 +15,8 @@ export const CsvToJsonConverter = memo(() => {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [isConverting, setIsConverting] = useState(false);
+  const [originalOutput, setOriginalOutput] = useState("");
+  const [isMinified, setIsMinified] = useState(false);
 
   const handleConvert = useCallback(async () => {
     if (!input.trim() || isConverting) return;
@@ -29,6 +31,8 @@ export const CsvToJsonConverter = memo(() => {
 
       if (result.success && result.data) {
         setOutput(result.data);
+        setOriginalOutput(result.data);
+        setIsMinified(false);
         toast.success("Conversion successful!");
         
         // Log conversion to Supabase (non-blocking)
@@ -38,11 +42,13 @@ export const CsvToJsonConverter = memo(() => {
       } else {
         toast.error(result.error || "Conversion failed");
         setOutput("");
+        setOriginalOutput("");
       }
     } catch (error) {
       toast.error("An unexpected error occurred");
       console.error("Conversion error:", error);
       setOutput("");
+      setOriginalOutput("");
     } finally {
       setIsConverting(false);
     }
@@ -53,6 +59,26 @@ export const CsvToJsonConverter = memo(() => {
     downloadFile(output, "converted.json");
     toast.success("File downloaded!");
   }, [output]);
+
+  const handleMinify = useCallback(() => {
+    if (output) {
+      try {
+        const parsed = JSON.parse(output);
+        const minified = JSON.stringify(parsed);
+        setOutput(minified);
+        setIsMinified(true);
+        toast.success("JSON minified!");
+      } catch (error) {
+        toast.error("Failed to minify JSON");
+      }
+    }
+  }, [output]);
+
+  const handleReset = useCallback(() => {
+    setOutput(originalOutput);
+    setIsMinified(false);
+    toast.success("Reset to original format");
+  }, [originalOutput]);
 
   return (
     <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-240px)]">
@@ -87,6 +113,10 @@ export const CsvToJsonConverter = memo(() => {
         readOnly
         placeholder="JSON output will appear here..."
         onDownload={handleDownload}
+        showMinify={output && !isMinified}
+        showReset={output && isMinified}
+        onMinify={handleMinify}
+        onReset={handleReset}
       />
     </div>
   );

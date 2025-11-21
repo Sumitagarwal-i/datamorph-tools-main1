@@ -2,9 +2,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { ThemeProvider } from "next-themes";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Shield, Download, Sparkles, Check } from "lucide-react";
+import { Zap, Shield, Download, Sparkles, Check, Minimize2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { lazy, Suspense, memo } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Lazy load converter components for better initial load
 const CsvToJsonConverter = lazy(() => import("@/components/CsvToJsonConverter").then(m => ({ default: m.CsvToJsonConverter })));
@@ -50,6 +51,18 @@ const Index = () => {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <div className="min-h-screen bg-background">
         <Header />
+        
+        {/* Update Notification Banner */}
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-b border-primary/20">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Minimize2 className="h-4 w-4 text-primary flex-shrink-0" />
+              <p>
+                <span className="font-semibold">New Feature:</span> You can now minify JSON output right away as part of your workflow! 🎉
+              </p>
+            </div>
+          </div>
+        </div>
         
         <main className="container mx-auto px-4 pb-8 pt-16">
           <Tabs defaultValue="auto-detect" className="w-full">

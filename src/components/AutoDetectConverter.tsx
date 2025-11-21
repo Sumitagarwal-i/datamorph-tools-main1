@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles, Minimize2, RotateCcw } from "lucide-react";
 import { ConverterPanel } from "./ConverterPanel";
 import { csvToJson, jsonToCsv, detectFormat, downloadFile } from "@/lib/converters";
 import { logConversion } from "@/lib/supabaseLogger";
@@ -13,6 +13,8 @@ export const AutoDetectConverter = () => {
   const [isConverting, setIsConverting] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<string>("");
   const [outputFormat, setOutputFormat] = useState<string>("");
+  const [originalOutput, setOriginalOutput] = useState("");
+  const [isMinified, setIsMinified] = useState(false);
 
   const handleConvert = async () => {
     setIsConverting(true);
@@ -28,7 +30,9 @@ export const AutoDetectConverter = () => {
       const result = jsonToCsv(input);
       if (result.success && result.data) {
         setOutput(result.data);
+        setOriginalOutput(result.data);
         setOutputFormat("CSV");
+        setIsMinified(false);
         toast.success("Detected JSON! Converted to CSV");
         if (result.itemCount) {
           await logConversion("JSON", "CSV", result.itemCount);
@@ -36,13 +40,16 @@ export const AutoDetectConverter = () => {
       } else {
         toast.error(result.error || "Conversion failed");
         setOutput("");
+        setOriginalOutput("");
       }
     } else if (format === 'csv') {
       // Convert CSV to JSON
       const result = csvToJson(input);
       if (result.success && result.data) {
         setOutput(result.data);
+        setOriginalOutput(result.data);
         setOutputFormat("JSON");
+        setIsMinified(false);
         toast.success("Detected CSV! Converted to JSON");
         if (result.itemCount) {
           await logConversion("CSV", "JSON", result.itemCount);
@@ -50,10 +57,12 @@ export const AutoDetectConverter = () => {
       } else {
         toast.error(result.error || "Conversion failed");
         setOutput("");
+        setOriginalOutput("");
       }
     } else {
       toast.error("Unable to detect format. Please use specific converters.");
       setOutput("");
+      setOriginalOutput("");
     }
 
     setIsConverting(false);
@@ -72,6 +81,26 @@ export const AutoDetectConverter = () => {
       setDetectedFormat("");
       setOutputFormat("");
     }
+  };
+
+  const handleMinify = () => {
+    if (outputFormat === "JSON" && output) {
+      try {
+        const parsed = JSON.parse(output);
+        const minified = JSON.stringify(parsed);
+        setOutput(minified);
+        setIsMinified(true);
+        toast.success("JSON minified!");
+      } catch (error) {
+        toast.error("Failed to minify JSON");
+      }
+    }
+  };
+
+  const handleReset = () => {
+    setOutput(originalOutput);
+    setIsMinified(false);
+    toast.success("Reset to original format");
   };
 
   return (
@@ -123,6 +152,10 @@ export const AutoDetectConverter = () => {
           readOnly
           placeholder="Converted output will appear here..."
           onDownload={handleDownload}
+          showMinify={outputFormat === "JSON" && output && !isMinified}
+          showReset={outputFormat === "JSON" && output && isMinified}
+          onMinify={handleMinify}
+          onReset={handleReset}
         />
       </div>
     </div>
