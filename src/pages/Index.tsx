@@ -103,7 +103,7 @@ const Index = () => {
 
           {/* Features List */}
           <section className="mt-16 max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold text-center mb-8">Why Choose DataMorph?</h2>
+            <h2 className="text-2xl font-bold text-center mb-8">Why Choose DatumInt?</h2>
             <div className="grid md:grid-cols-2 gap-6">
               <BenefitItem 
                 title="No Account Required" 
