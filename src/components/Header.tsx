@@ -13,7 +13,7 @@ export const Header = () => {
   return (
     <>
       <header className="border-b border-border bg-card overflow-x-hidden">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-full">
+        <div className="container py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 max-w-full">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink overflow-hidden">
               <img src="/Logo.png" alt="DatumInt Logo" className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0" />

@@ -54,7 +54,7 @@ const Index = () => {
         
         {/* Update Notification Banner */}
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-b border-primary/20">
-          <div className="container mx-auto px-3 sm:px-6 py-2.5 sm:py-3">
+          <div className="container py-2.5 sm:py-3">
             <div className="flex items-center gap-2 text-[11px] sm:text-xs md:text-sm">
               <span className="text-sm sm:text-base flex-shrink-0">✨</span>
               <p className="line-clamp-2 sm:line-clamp-1">
@@ -64,7 +64,7 @@ const Index = () => {
           </div>
         </div>
         
-        <main className="container mx-auto px-3 sm:px-6 lg:px-8 pb-6 sm:pb-8 lg:pb-12 pt-6 sm:pt-10 lg:pt-14 max-w-full overflow-x-hidden">
+        <main className="container pb-6 sm:pb-8 lg:pb-12 pt-6 sm:pt-10 lg:pt-14 max-w-full overflow-x-hidden">
           <Tabs defaultValue="auto-detect" className="w-full max-w-full">
             <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5 mb-6 sm:mb-8 lg:mb-10 bg-muted/60 dark:bg-muted/30 backdrop-blur-md border border-border/50 p-1 h-auto">
               <TabsTrigger value="auto-detect" className="gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm py-2 sm:py-2.5 px-2 sm:px-3">
@@ -76,25 +76,25 @@ const Index = () => {
               <TabsTrigger value="json-tools" className="text-[10px] sm:text-xs md:text-sm py-2 sm:py-2.5 px-2 sm:px-3"><span className="truncate">Tools</span></TabsTrigger>
             </TabsList>
 
-            <TabsContent value="auto-detect" className="space-y-4 sm:space-y-6 px-1 sm:px-2">
+            <TabsContent value="auto-detect" className="space-y-4 sm:space-y-6 px-2 sm:px-5 md:px-7 lg:px-10">
               <Suspense fallback={<ConverterLoader />}>
                 <AutoDetectConverter />
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="csv-to-json" className="space-y-4 sm:space-y-6 px-1 sm:px-2">
+            <TabsContent value="csv-to-json" className="space-y-4 sm:space-y-6 px-2 sm:px-5 md:px-7 lg:px-10">
               <Suspense fallback={<ConverterLoader />}>
                 <CsvToJsonConverter />
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="json-to-csv" className="space-y-4 sm:space-y-6 px-1 sm:px-2">
+            <TabsContent value="json-to-csv" className="space-y-4 sm:space-y-6 px-2 sm:px-5 md:px-7 lg:px-10">
               <Suspense fallback={<ConverterLoader />}>
                 <JsonToCsvConverter />
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="json-tools" className="space-y-4 sm:space-y-6 px-1 sm:px-2">
+            <TabsContent value="json-tools" className="space-y-4 sm:space-y-6 px-2 sm:px-5 md:px-7 lg:px-10">
               <Suspense fallback={<ConverterLoader />}>
                 <DataToolsPanel />
               </Suspense>
