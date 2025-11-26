@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://datamorphio.vercel.app/sitemap.xml
+Sitemap: https://datumint.vercel.app/sitemap.xml
