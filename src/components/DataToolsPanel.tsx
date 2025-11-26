@@ -335,9 +335,9 @@ export const DataToolsPanel = () => {
 
   return (
     <div className="space-y-4">
-      <div className="text-center mb-6 min-h-[80px] flex flex-col items-center justify-center">
-        <h2 className="text-xl font-semibold mb-2">More Actions - Auto-Detect JSON & CSV</h2>
-        <p className="text-sm text-muted-foreground">
+      <div className="text-center mb-4 sm:mb-6 min-h-[60px] sm:min-h-[80px] flex flex-col items-center justify-center px-2">
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">More Actions - Auto-Detect JSON & CSV</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Format, validate, and manipulate JSON or CSV data instantly
         </p>
         {detectedFormat !== 'unknown' && (
@@ -360,7 +360,7 @@ export const DataToolsPanel = () => {
         </Alert>
       )}
 
-      <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-360px)]">
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_auto_1fr] gap-4 min-h-[400px] lg:h-[calc(100vh-360px)] max-w-full overflow-hidden">
         <ConverterPanel
           label={`Input ${detectedFormat === 'unknown' ? 'Data' : detectedFormat.toUpperCase()}`}
           value={input}
@@ -372,12 +372,12 @@ export const DataToolsPanel = () => {
           onDemoLoad={loadDemoData}
         />
 
-        <div className="flex items-center justify-center flex-col gap-3">
+        <div className="flex flex-wrap lg:flex-col items-center justify-center gap-2 sm:gap-3 order-last lg:order-none py-2 lg:py-0">
           {/* Common actions for both JSON and CSV */}
           <Button
             onClick={handleBeautify}
             disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             size="lg"
           >
             {isProcessing ? (
@@ -390,7 +390,7 @@ export const DataToolsPanel = () => {
           <Button
             onClick={handleMinify}
             disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             variant="outline"
             size="lg"
           >
@@ -404,7 +404,7 @@ export const DataToolsPanel = () => {
           <Button
             onClick={handleRepair}
             disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             variant="secondary"
             size="lg"
           >
@@ -418,7 +418,7 @@ export const DataToolsPanel = () => {
           <Button
             onClick={handleValidate}
             disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             variant="outline"
             size="lg"
           >

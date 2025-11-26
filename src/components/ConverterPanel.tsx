@@ -134,19 +134,20 @@ export const ConverterPanel = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-foreground">{label}</label>
-        <div className="flex gap-2">
+    <div className="flex flex-col h-full max-w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 max-w-full">
+        <label className="text-xs sm:text-sm font-medium text-foreground truncate max-w-full">{label}</label>
+        <div className="flex flex-wrap gap-1 sm:gap-1.5">
           {showDemoButton && onDemoLoad && !readOnly && (
             <Button
               size="sm"
               variant="outline"
               onClick={onDemoLoad}
-              className="gap-2"
+              className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
             >
-              <Sparkles className="h-4 w-4" />
-              Try Demo Data
+              <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Try Demo Data</span>
+              <span className="sm:hidden">Demo</span>
             </Button>
           )}
           {allowFileUpload && !readOnly && (
@@ -162,10 +163,10 @@ export const ConverterPanel = ({
                 size="sm"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className="gap-2"
+                className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
               >
-                <Upload className="h-4 w-4" />
-                Upload
+                <Upload className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Upload</span>
               </Button>
             </>
           )}
@@ -179,10 +180,10 @@ export const ConverterPanel = ({
                       variant="outline"
                       onClick={onRepair}
                       disabled={!repairEnabled}
-                      className="gap-2"
+                      className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
                     >
-                      <Wrench className="h-4 w-4" />
-                      Repair
+                      <Wrench className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      <span className="hidden sm:inline">Repair</span>
                     </Button>
                   </span>
                 </TooltipTrigger>
@@ -199,10 +200,10 @@ export const ConverterPanel = ({
                   size="sm"
                   variant="outline"
                   onClick={onMinify}
-                  className="gap-2"
+                  className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
                 >
-                  <Minimize2 className="h-4 w-4" />
-                  Minify
+                  <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">Minify</span>
                 </Button>
               )}
               {showReset && onReset && (
@@ -210,30 +211,30 @@ export const ConverterPanel = ({
                   size="sm"
                   variant="outline"
                   onClick={onReset}
-                  className="gap-2"
+                  className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
                 >
-                  <RotateCcw className="h-4 w-4" />
-                  Reset
+                  <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">Reset</span>
                 </Button>
               )}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleCopy}
-                className="gap-2"
+                className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
               >
-                <Copy className="h-4 w-4" />
-                Copy
+                <Copy className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Copy</span>
               </Button>
               {onDownload && (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={onDownload}
-                  className="gap-2"
+                  className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
                 >
-                  <Download className="h-4 w-4" />
-                  Download
+                  <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">Download</span>
                 </Button>
               )}
             </>
@@ -253,7 +254,7 @@ export const ConverterPanel = ({
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
           readOnly={readOnly}
-          className="h-full w-full font-mono text-sm resize-none overflow-auto"
+          className={`h-full w-full font-mono text-sm resize-none overflow-auto ${readOnly ? 'hover:border-input hover:shadow-sm' : ''}`}
         />
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm rounded-md flex items-center justify-center pointer-events-none">

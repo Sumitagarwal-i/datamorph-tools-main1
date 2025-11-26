@@ -99,9 +99,9 @@ export const JsonBeautifier = () => {
 
   return (
     <div className="space-y-4">
-      <div className="text-center mb-6 min-h-[80px] flex flex-col items-center justify-center">
-        <h2 className="text-xl font-semibold mb-2">JSON Beautifier & Validator</h2>
-        <p className="text-sm text-muted-foreground">
+      <div className="text-center mb-4 sm:mb-6 min-h-[60px] sm:min-h-[80px] flex flex-col items-center justify-center px-2">
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">JSON Beautifier & Validator</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Format, validate, and minify JSON data instantly
         </p>
       </div>
@@ -119,7 +119,7 @@ export const JsonBeautifier = () => {
         </Alert>
       )}
 
-      <div className="grid md:grid-cols-[1fr_auto_1fr] gap-4 h-[calc(100vh-360px)]">
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_auto_1fr] gap-4 min-h-[400px] lg:h-[calc(100vh-360px)] max-w-full overflow-hidden">
         <ConverterPanel
           label="Input JSON"
           value={input}
@@ -129,11 +129,11 @@ export const JsonBeautifier = () => {
           acceptedFileTypes=".json,application/json"
         />
 
-        <div className="flex items-center justify-center flex-col gap-3">
+        <div className="flex items-center justify-center flex-col gap-2 sm:gap-3 order-last lg:order-none py-2 lg:py-0">
           <Button
             onClick={handleBeautify}
             disabled={!input.trim() || isProcessing || isValid === false}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             size="lg"
           >
             {isProcessing ? (
@@ -145,7 +145,7 @@ export const JsonBeautifier = () => {
           <Button
             onClick={handleMinify}
             disabled={!input.trim() || isProcessing || isValid === false}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             variant="outline"
             size="lg"
           >
@@ -158,7 +158,7 @@ export const JsonBeautifier = () => {
           <Button
             onClick={handleRepair}
             disabled={!input.trim() || isProcessing}
-            className="gap-2 w-32"
+            className="gap-2 w-full sm:w-32"
             variant="secondary"
             size="lg"
           >
