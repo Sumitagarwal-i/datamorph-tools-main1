@@ -97,6 +97,7 @@ export const CsvToJsonConverter = memo(() => {
           placeholder={CSV_EXAMPLE}
           allowFileUpload={true}
           acceptedFileTypes=".csv,text/csv"
+          isCsvOutput={false}
         />
 
       <div className="flex items-center justify-center order-last lg:order-none py-2 lg:py-0">

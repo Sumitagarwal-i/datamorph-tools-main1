@@ -1,7 +1,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles } from "lucide-react";
+import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
 import {
@@ -10,6 +10,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ConverterPanelProps {
   label: string;
@@ -30,6 +39,7 @@ interface ConverterPanelProps {
   onRepair?: () => void;
   showDemoButton?: boolean;
   onDemoLoad?: () => void;
+  isCsvOutput?: boolean;
 }
 
 export const ConverterPanel = ({
@@ -51,9 +61,11 @@ export const ConverterPanel = ({
   onRepair,
   showDemoButton = false,
   onDemoLoad,
+  isCsvOutput = false,
 }: ConverterPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
 
   const handleCopy = () => {
     navigator.clipboard.writeText(value);
@@ -104,6 +116,41 @@ export const ConverterPanel = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) processFile(file);
+  };
+
+  // Parse CSV text into table data
+  const parseCsvForTable = (csvText: string): { headers: string[]; rows: string[][] } => {
+    if (!csvText.trim()) return { headers: [], rows: [] };
+    
+    const lines = csvText.trim().split('\n');
+    if (lines.length === 0) return { headers: [], rows: [] };
+    
+    // Simple CSV parsing (handles quoted fields)
+    const parseLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+    
+    const headers = parseLine(lines[0]);
+    const rows = lines.slice(1).map(line => parseLine(line));
+    
+    return { headers, rows };
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -217,6 +264,26 @@ export const ConverterPanel = ({
                   <span className="hidden sm:inline">Reset</span>
                 </Button>
               )}
+              {isCsvOutput && value.trim() && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewMode(viewMode === 'text' ? 'table' : 'text')}
+                        className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
+                      >
+                        <Table2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="hidden sm:inline">{viewMode === 'text' ? 'Table' : 'Text'}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{viewMode === 'text' ? 'View as table' : 'View as text'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -249,13 +316,56 @@ export const ConverterPanel = ({
           isDragging ? "ring-2 ring-primary ring-offset-2" : ""
         }`}
       >
-        <Textarea
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          placeholder={placeholder}
-          readOnly={readOnly}
-          className={`h-full w-full font-mono text-sm resize-none overflow-auto ${readOnly ? 'hover:border-input hover:shadow-sm' : ''}`}
-        />
+        {isCsvOutput && viewMode === 'table' && value.trim() ? (
+          <ScrollArea className="h-full w-full border rounded-md bg-background">
+            <div className="p-2">
+              {(() => {
+                const { headers, rows } = parseCsvForTable(value);
+                if (headers.length === 0) {
+                  return (
+                    <div className="text-center text-muted-foreground py-8">
+                      No data to display
+                    </div>
+                  );
+                }
+                return (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {headers.map((header, idx) => (
+                          <TableHead key={idx} className="font-semibold whitespace-nowrap text-xs">
+                            {header}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row, rowIdx) => (
+                        <TableRow key={rowIdx}>
+                          {row.map((cell, cellIdx) => (
+                            <TableCell key={cellIdx} className="font-mono text-xs whitespace-nowrap">
+                              {cell || <span className="text-muted-foreground italic">null</span>}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
+            </div>
+          </ScrollArea>
+        ) : (
+          <Textarea
+            value={value}
+            onChange={(e) => onChange?.(e.target.value)}
+            placeholder={placeholder}
+            readOnly={readOnly}
+            className={`h-full w-full font-mono text-sm resize-none overflow-auto ${
+              isCsvOutput ? 'leading-relaxed tracking-wide' : ''
+            } ${readOnly ? 'hover:border-input hover:shadow-sm' : ''}`}
+          />
+        )}
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm rounded-md flex items-center justify-center pointer-events-none">
             <div className="text-center">

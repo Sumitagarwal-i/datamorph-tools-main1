@@ -117,6 +117,7 @@ export const JsonToCsvConverter = memo(() => {
         readOnly
         placeholder="CSV output will appear here..."
         onDownload={handleDownload}
+        isCsvOutput={true}
       />
       </div>
     </div>

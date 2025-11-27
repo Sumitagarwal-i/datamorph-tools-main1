@@ -78,38 +78,291 @@ export const csvToJson = (csvText: string): ConversionResult => {
   }
 };
 
-// Helper function to flatten nested JSON into rows
-const flattenNestedJSON = (data: unknown, parentKey: string = ''): Record<string, unknown>[] => {
-  const rows: Record<string, unknown>[] = [];
+/**
+ * Industry-standard JSON normalization engine
+ * Follows pandas, BigQuery, Airbyte, and Databricks conventions
+ */
 
-  if (Array.isArray(data)) {
-    // If it's an array of objects, flatten each item
-    data.forEach(item => {
-      if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-        // Add parent key as a column if exists
-        const flatItem = parentKey ? { category: parentKey, ...item } : item;
-        rows.push(flatItem);
-      }
-    });
-  } else if (typeof data === 'object' && data !== null) {
-    // If it's an object with nested arrays, flatten recursively
-    Object.keys(data).forEach(key => {
-      const value = data[key];
-      if (Array.isArray(value)) {
-        // Recursively flatten with the key as parent category
-        const nestedRows = flattenNestedJSON(value, key);
-        rows.push(...nestedRows);
-      } else if (typeof value === 'object' && value !== null) {
-        // Handle nested objects
-        const nestedRows = flattenNestedJSON(value, key);
-        rows.push(...nestedRows);
-      }
-    });
-  }
-
-  return rows;
+// Check if array contains only objects
+const isArrayOfObjects = (arr: unknown[]): boolean => {
+  return arr.length > 0 && arr.every(item => 
+    typeof item === 'object' && item !== null && !Array.isArray(item)
+  );
 };
 
+// Check if array contains only scalars
+const isArrayOfScalars = (arr: unknown[]): boolean => {
+  return arr.length > 0 && arr.every(item => 
+    typeof item !== 'object' || item === null
+  );
+};
+
+/**
+ * Flatten a single record using dot-notation for nested objects
+ * Arrays are preserved for later processing
+ * Empty objects are skipped to reduce noise
+ */
+const flattenRecord = (
+  record: Record<string, unknown>,
+  parentKey: string = '',
+  result: Record<string, unknown> = {},
+  maxDepth: number = 10,
+  currentDepth: number = 0
+): Record<string, unknown> => {
+  for (const [key, value] of Object.entries(record)) {
+    const newKey = parentKey ? `${parentKey}.${key}` : key;
+
+    if (value === null || value === undefined) {
+      result[newKey] = value;
+    } else if (Array.isArray(value)) {
+      // Preserve arrays - will be handled in normalization step
+      result[newKey] = value;
+    } else if (typeof value === 'object') {
+      const valueObj = value as Record<string, unknown>;
+      
+      // Skip empty objects to avoid clutter
+      if (Object.keys(valueObj).length === 0) {
+        // Store empty objects as null instead of creating columns
+        continue;
+      }
+      
+      // Prevent excessive nesting (protection against circular refs and huge depth)
+      if (currentDepth >= maxDepth) {
+        result[newKey] = JSON.stringify(value);
+        continue;
+      }
+      
+      // Recursively flatten nested objects with dot notation
+      flattenRecord(valueObj, newKey, result, maxDepth, currentDepth + 1);
+    } else {
+      // Scalar values (string, number, boolean)
+      result[newKey] = value;
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Get depth of a dot-notation key (e.g., "user.address.city" = 3)
+ */
+const getKeyDepth = (key: string): number => {
+  return key.split('.').length;
+};
+
+/**
+ * Intelligently prioritize fields based on common patterns
+ * Returns a score (higher = more important)
+ */
+const getFieldPriority = (key: string, value: unknown): number => {
+  let score = 100; // Base score
+  
+  const depth = getKeyDepth(key);
+  const lowerKey = key.toLowerCase();
+  
+  // Penalty for deep nesting (exponential)
+  score -= (depth - 1) * 15;
+  
+  // Boost common important fields
+  if (lowerKey.includes('id') || lowerKey.includes('name') || lowerKey.includes('type')) {
+    score += 30;
+  }
+  
+  // Boost top-level fields
+  if (depth === 1) {
+    score += 20;
+  }
+  
+  // Penalty for overly specific nested paths
+  if (depth > 4) {
+    score -= 30;
+  }
+  
+  // Boost fields with actual values (not null/empty)
+  if (value !== null && value !== undefined && value !== '') {
+    score += 10;
+  }
+  
+  // Penalty for very long key names (likely over-nested)
+  if (key.length > 50) {
+    score -= 20;
+  }
+  
+  return score;
+};
+
+/**
+ * Extract all possible key paths from an array of records
+ * Preserves original key order from JSON
+ * Optionally filters out low-priority deeply nested fields
+ * This ensures consistent CSV columns across all rows
+ */
+const extractAllKeys = (
+  records: Record<string, unknown>[],
+  prioritizeFields: boolean = true
+): string[] => {
+  const keyOrderMap = new Map<string, number>();
+  const keyPriorityMap = new Map<string, number>();
+  let order = 0;
+  
+  for (const record of records) {
+    const flattened = flattenRecord(record);
+    for (const [key, value] of Object.entries(flattened)) {
+      // Only add non-array keys (arrays will be handled separately)
+      if (!Array.isArray(value) && !keyOrderMap.has(key)) {
+        keyOrderMap.set(key, order++);
+        
+        if (prioritizeFields) {
+          // Calculate priority score
+          const currentPriority = keyPriorityMap.get(key) || 0;
+          const newPriority = getFieldPriority(key, value);
+          keyPriorityMap.set(key, Math.max(currentPriority, newPriority));
+        }
+      }
+    }
+  }
+  
+  let keys = Array.from(keyOrderMap.keys());
+  
+  // Filter out very low priority fields if we have too many columns
+  if (prioritizeFields && keys.length > 50) {
+    const threshold = 40; // Minimum priority score to include
+    keys = keys.filter(key => {
+      const priority = keyPriorityMap.get(key) || 0;
+      return priority >= threshold;
+    });
+  }
+  
+  // Return keys in the order they were first encountered
+  return keys;
+};
+
+/**
+ * Normalize a single record: expand arrays of objects into multiple rows
+ * This is the ETL standard behavior (similar to pandas explode)
+ */
+const normalizeRecord = (record: Record<string, unknown>): Record<string, unknown>[] => {
+  const flattened = flattenRecord(record);
+  const results: Record<string, unknown>[] = [];
+  
+  // Find arrays that need expansion
+  const arrayFields: Array<{ key: string; value: unknown[] }> = [];
+  const scalarFields: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(flattened)) {
+    if (Array.isArray(value)) {
+      if (isArrayOfObjects(value)) {
+        // Array of objects - will expand into multiple rows
+        arrayFields.push({ key, value });
+      } else if (isArrayOfScalars(value)) {
+        // Array of scalars - join with semicolons
+        scalarFields[key] = value.map(v => String(v ?? '')).join(';');
+      } else {
+        // Mixed array - serialize as JSON
+        scalarFields[key] = JSON.stringify(value);
+      }
+    } else {
+      scalarFields[key] = value;
+    }
+  }
+  
+  // If no arrays to expand, return single row
+  if (arrayFields.length === 0) {
+    return [scalarFields];
+  }
+  
+  // Expand first array of objects
+  const firstArray = arrayFields[0];
+  for (const arrayItem of firstArray.value) {
+    if (typeof arrayItem === 'object' && arrayItem !== null) {
+      // Flatten the array item with parent key prefix
+      const flattenedItem = flattenRecord(
+        arrayItem as Record<string, unknown>,
+        firstArray.key
+      );
+      
+      // Merge parent fields with child fields
+      const mergedRow = { ...scalarFields, ...flattenedItem };
+      results.push(mergedRow);
+    }
+  }
+  
+  // If multiple array fields exist, handle remaining arrays
+  // For now, serialize them (can be enhanced later for cross-product)
+  if (arrayFields.length > 1) {
+    for (let i = 1; i < arrayFields.length; i++) {
+      const field = arrayFields[i];
+      for (const row of results) {
+        row[field.key] = JSON.stringify(field.value);
+      }
+    }
+  }
+  
+  return results.length > 0 ? results : [scalarFields];
+};
+
+/**
+ * Detect if an object is a collection where each key represents an entity
+ * (e.g., { "com": {...}, "net": {...}, "co": {...} })
+ */
+const isEntityCollection = (obj: Record<string, unknown>): boolean => {
+  const values = Object.values(obj);
+  
+  // Must have at least 2 entries
+  if (values.length < 2) return false;
+  
+  // All values must be objects (not arrays)
+  if (!values.every(v => typeof v === 'object' && v !== null && !Array.isArray(v))) {
+    return false;
+  }
+  
+  // Check if objects have similar structure (share common keys)
+  const firstObj = values[0] as Record<string, unknown>;
+  const firstKeys = new Set(Object.keys(firstObj));
+  
+  // At least 80% of values should have similar structure
+  const similarCount = values.filter(v => {
+    const vObj = v as Record<string, unknown>;
+    const vKeys = Object.keys(vObj);
+    const commonKeys = vKeys.filter(k => firstKeys.has(k));
+    return commonKeys.length / vKeys.length >= 0.5;
+  }).length;
+  
+  return similarCount / values.length >= 0.8;
+};
+
+/**
+ * Convert entity collection to array of records with entity key
+ * Example: { "com": {type: "gTLD"}, "net": {type: "gTLD"} }
+ * Becomes: [{ tld: "com", type: "gTLD" }, { tld: "net", type: "gTLD" }]
+ */
+const expandEntityCollection = (
+  obj: Record<string, unknown>,
+  keyName: string = 'id'
+): Record<string, unknown>[] => {
+  return Object.entries(obj).map(([key, value]) => {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return {
+        [keyName]: key,
+        ...(value as Record<string, unknown>)
+      };
+    }
+    return { [keyName]: key, value };
+  });
+};
+
+/**
+ * Professional JSON to CSV converter
+ * Industry-standard normalization following pandas, BigQuery, Airbyte conventions
+ * 
+ * Features:
+ * - Dot-notation flattening for nested objects
+ * - Array of objects expansion (multiple rows per parent)
+ * - Entity collection detection (e.g., {com: {...}, net: {...}})
+ * - Consistent schema across all rows
+ * - Proper handling of scalar arrays (semicolon-joined)
+ * - Mixed arrays serialized as JSON
+ */
 export const jsonToCsv = (jsonText: string): ConversionResult => {
   try {
     if (!jsonText.trim()) {
@@ -117,66 +370,98 @@ export const jsonToCsv = (jsonText: string): ConversionResult => {
     }
 
     const jsonData: unknown = JSON.parse(jsonText);
-    let flattenedData: Record<string, unknown>[] = [];
+    let normalizedRows: Record<string, unknown>[] = [];
 
-    // Try to intelligently flatten the JSON structure
+    // Step 1: Normalize input to array of records
+    let records: Record<string, unknown>[] = [];
+    
     if (Array.isArray(jsonData)) {
-      // If it's already an array of objects, use it directly
-      flattenedData = jsonData.map(item => {
-        if (typeof item === 'object' && item !== null) {
-          // Flatten any nested objects within the array items
-          const flatItem: Record<string, unknown> = {};
-          Object.keys(item).forEach(key => {
-            const value = item[key];
-            if (Array.isArray(value)) {
-              flatItem[key] = JSON.stringify(value);
-            } else if (typeof value === 'object' && value !== null) {
-              flatItem[key] = JSON.stringify(value);
-            } else {
-              flatItem[key] = value;
-            }
-          });
-          return flatItem;
-        }
-        return item;
-      });
-    } else if (typeof jsonData === 'object' && jsonData !== null) {
-      // Try to flatten nested structure intelligently
-      flattenedData = flattenNestedJSON(jsonData);
+      // Filter to only objects
+      records = jsonData.filter(item => 
+        typeof item === 'object' && item !== null && !Array.isArray(item)
+      ) as Record<string, unknown>[];
       
-      // If no rows were created (flat object), wrap in array
-      if (flattenedData.length === 0) {
-        flattenedData = [jsonData];
+      if (records.length === 0) {
+        return {
+          success: false,
+          error: "JSON array must contain objects. Example: [{\"name\":\"John\",\"age\":30}]",
+        };
+      }
+    } else if (typeof jsonData === 'object' && jsonData !== null) {
+      const obj = jsonData as Record<string, unknown>;
+      
+      // Check if it's a nested structure with a wrapper key (e.g., {data: {...}})
+      if (Object.keys(obj).length === 1) {
+        const singleKey = Object.keys(obj)[0];
+        const singleValue = obj[singleKey];
+        
+        if (typeof singleValue === 'object' && singleValue !== null && !Array.isArray(singleValue)) {
+          const innerObj = singleValue as Record<string, unknown>;
+          
+          // Check if inner object is an entity collection
+          if (isEntityCollection(innerObj)) {
+            // Expand entity collection (e.g., {data: {com: {...}, net: {...}}})
+            records = expandEntityCollection(innerObj, singleKey === 'data' ? 'tld' : 'id');
+          } else {
+            // Regular nested object
+            records = [obj];
+          }
+        } else {
+          records = [obj];
+        }
+      }
+      // Check if root object is an entity collection
+      else if (isEntityCollection(obj)) {
+        records = expandEntityCollection(obj, 'id');
+      }
+      // Single object - check if it contains arrays that should be expanded
+      else {
+        const hasArrays = Object.values(obj).some(v => Array.isArray(v));
+        
+        if (hasArrays) {
+          // Try to expand arrays within the object
+          const expanded = normalizeRecord(obj);
+          records = expanded.length > 0 ? expanded : [obj];
+        } else {
+          records = [obj];
+        }
       }
     } else {
       return {
         success: false,
-        error: "JSON must be an object or array of objects. Example: [{\"name\":\"John\",\"age\":30}]",
+        error: "JSON must be an object or array of objects",
       };
     }
 
-    if (flattenedData.length === 0) {
+    // Step 2: Normalize each record (expand arrays, flatten nested objects)
+    for (const record of records) {
+      const normalized = normalizeRecord(record);
+      normalizedRows.push(...normalized);
+    }
+
+    if (normalizedRows.length === 0) {
       return { success: false, error: "No data to convert" };
     }
 
-    // Ensure all objects have consistent keys
-    const allKeys = new Set<string>();
-    flattenedData.forEach(item => {
-      if (typeof item === 'object' && item !== null) {
-        Object.keys(item).forEach(key => allKeys.add(key));
-      }
-    });
-
-    // Normalize all rows to have the same keys
-    const normalizedData = flattenedData.map(item => {
+    // Step 3: Extract unified schema (all possible column names)
+    // Keys are in the order they first appeared in the JSON
+    const allKeys = extractAllKeys(normalizedRows);
+    
+    // Step 4: Ensure all rows have consistent columns in original order
+    const finalRows = normalizedRows.map(row => {
       const normalized: Record<string, unknown> = {};
-      allKeys.forEach(key => {
-        normalized[key] = item && typeof item === 'object' && key in item ? item[key] : '';
-      });
+      
+      // Maintain original key order from JSON
+      for (const key of allKeys) {
+        // Get value or empty string if missing
+        normalized[key] = row[key] !== undefined ? row[key] : '';
+      }
+      
       return normalized;
     });
 
-    const csv = Papa.unparse(normalizedData, {
+    // Step 5: Generate CSV
+    const csv = Papa.unparse(finalRows, {
       quotes: false,
       quoteChar: '"',
       escapeChar: '"',
@@ -186,7 +471,7 @@ export const jsonToCsv = (jsonText: string): ConversionResult => {
     return {
       success: true,
       data: csv,
-      itemCount: flattenedData.length,
+      itemCount: finalRows.length,
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
