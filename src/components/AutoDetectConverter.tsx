@@ -313,6 +313,7 @@ export const AutoDetectConverter = () => {
           showReset={outputFormat === "JSON" && output && isMinified}
           onMinify={handleMinify}
           onReset={handleReset}
+          isCsvOutput={outputFormat === "CSV"}
         />
       </div>
     </div>

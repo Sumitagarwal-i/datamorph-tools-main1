@@ -370,6 +370,7 @@ export const DataToolsPanel = () => {
           acceptedFileTypes=".json,.csv,application/json,text/csv"
           showDemoButton={true}
           onDemoLoad={loadDemoData}
+          isCsvOutput={detectedFormat === 'csv'}
         />
 
         <div className="flex flex-wrap lg:flex-col items-center justify-center gap-2 sm:gap-3 order-last lg:order-none py-2 lg:py-0">
@@ -436,6 +437,7 @@ export const DataToolsPanel = () => {
           readOnly
           placeholder="Formatted data will appear here..."
           onDownload={handleDownload}
+          isCsvOutput={detectedFormat === 'csv'}
         />
       </div>
     </div>
