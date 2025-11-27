@@ -317,8 +317,8 @@ export const ConverterPanel = ({
         }`}
       >
         {isCsvOutput && viewMode === 'table' && value.trim() ? (
-          <ScrollArea className="h-full w-full border rounded-md bg-background">
-            <div className="p-2">
+          <div className="h-full w-full border rounded-md bg-background overflow-auto">
+            <div className="min-w-max p-2">
               {(() => {
                 const { headers, rows } = parseCsvForTable(value);
                 if (headers.length === 0) {
@@ -333,7 +333,7 @@ export const ConverterPanel = ({
                     <TableHeader>
                       <TableRow>
                         {headers.map((header, idx) => (
-                          <TableHead key={idx} className="font-semibold whitespace-nowrap text-xs">
+                          <TableHead key={idx} className="font-semibold whitespace-nowrap text-xs sticky top-0 bg-background z-10">
                             {header}
                           </TableHead>
                         ))}
@@ -354,7 +354,7 @@ export const ConverterPanel = ({
                 );
               })()}
             </div>
-          </ScrollArea>
+          </div>
         ) : (
           <Textarea
             value={value}
