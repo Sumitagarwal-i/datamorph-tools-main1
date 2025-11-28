@@ -1,0 +1,32 @@
+{
+  "name": "DatumInt — Free JSON & CSV Data Tools",
+  "short_name": "DatumInt",
+  "description": "Free online data tools suite: Convert JSON to CSV, CSV to JSON, beautify, minify, validate, repair and sort data instantly.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/web.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/web.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity", "developer-tools"],
+  "screenshots": [
+    {
+      "src": "/web.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ]
+}
