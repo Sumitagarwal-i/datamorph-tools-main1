@@ -302,6 +302,66 @@ const normalizeRecord = (record: Record<string, unknown>): Record<string, unknow
 };
 
 /**
+ * Detect if an object contains multiple arrays of objects with similar structure
+ * This is the "categorized arrays" pattern like:
+ * { groceries: [{item, qty}], personalCare: [{item, qty}] }
+ */
+const isCategorizedArrays = (obj: Record<string, unknown>): boolean => {
+  const values = Object.values(obj);
+  
+  // Must have at least 2 entries
+  if (values.length < 2) return false;
+  
+  // All values must be arrays of objects
+  const arrayValues = values.filter(v => Array.isArray(v) && isArrayOfObjects(v as unknown[]));
+  if (arrayValues.length < 2) return false;
+  
+  // Check if arrays have similar object structure
+  const firstArray = arrayValues[0] as Record<string, unknown>[];
+  if (firstArray.length === 0) return false;
+  
+  const firstObjKeys = new Set(Object.keys(firstArray[0]));
+  
+  // At least 80% of arrays should have objects with similar structure
+  const similarCount = arrayValues.filter(arr => {
+    const arrTyped = arr as Record<string, unknown>[];
+    if (arrTyped.length === 0) return false;
+    const arrKeys = Object.keys(arrTyped[0]);
+    const commonKeys = arrKeys.filter(k => firstObjKeys.has(k));
+    return commonKeys.length / arrKeys.length >= 0.5;
+  }).length;
+  
+  return similarCount / arrayValues.length >= 0.8;
+};
+
+/**
+ * Expand categorized arrays into flat rows with category column
+ * Input: { groceries: [{item: "Apple"}], personalCare: [{item: "Soap"}] }
+ * Output: [{ Category: "Groceries", item: "Apple" }, { Category: "PersonalCare", item: "Soap" }]
+ */
+const expandCategorizedArrays = (obj: Record<string, unknown>): Record<string, unknown>[] => {
+  const results: Record<string, unknown>[] = [];
+  
+  for (const [categoryKey, categoryValue] of Object.entries(obj)) {
+    if (Array.isArray(categoryValue) && isArrayOfObjects(categoryValue)) {
+      // Format category name: groceries -> Groceries, personalCare -> PersonalCare
+      let categoryName = categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1);
+      
+      for (const item of categoryValue) {
+        if (typeof item === 'object' && item !== null) {
+          results.push({
+            Category: categoryName,
+            ...(item as Record<string, unknown>)
+          });
+        }
+      }
+    }
+  }
+  
+  return results;
+};
+
+/**
  * Detect if an object is a collection where each key represents an entity
  * (e.g., { "com": {...}, "net": {...}, "co": {...} })
  */
@@ -390,7 +450,7 @@ export const jsonToCsv = (jsonText: string): ConversionResult => {
     } else if (typeof jsonData === 'object' && jsonData !== null) {
       const obj = jsonData as Record<string, unknown>;
       
-      // Check if it's a nested structure with a wrapper key (e.g., {data: {...}})
+      // Check if it's a nested structure with a wrapper key (e.g., {shoppingList: {...}})
       if (Object.keys(obj).length === 1) {
         const singleKey = Object.keys(obj)[0];
         const singleValue = obj[singleKey];
@@ -398,17 +458,28 @@ export const jsonToCsv = (jsonText: string): ConversionResult => {
         if (typeof singleValue === 'object' && singleValue !== null && !Array.isArray(singleValue)) {
           const innerObj = singleValue as Record<string, unknown>;
           
+          // Check if inner object has categorized arrays (like shoppingList with groceries, personalCare, etc.)
+          if (isCategorizedArrays(innerObj)) {
+            records = expandCategorizedArrays(innerObj);
+          }
           // Check if inner object is an entity collection
-          if (isEntityCollection(innerObj)) {
+          else if (isEntityCollection(innerObj)) {
             // Expand entity collection (e.g., {data: {com: {...}, net: {...}}})
             records = expandEntityCollection(innerObj, singleKey === 'data' ? 'tld' : 'id');
           } else {
             // Regular nested object
             records = [obj];
           }
+        } else if (Array.isArray(singleValue) && isArrayOfObjects(singleValue)) {
+          // Direct array of objects under a wrapper key (e.g., {users: [{...}, {...}]})
+          records = singleValue as Record<string, unknown>[];
         } else {
           records = [obj];
         }
+      }
+      // Check if root object has categorized arrays
+      else if (isCategorizedArrays(obj)) {
+        records = expandCategorizedArrays(obj);
       }
       // Check if root object is an entity collection
       else if (isEntityCollection(obj)) {
