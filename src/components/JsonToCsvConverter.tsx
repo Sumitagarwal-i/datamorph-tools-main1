@@ -1,6 +1,12 @@
 import { useState, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ConverterPanel } from "./ConverterPanel";
 import { jsonToCsv, downloadFile, repairJson } from "@/lib/converters";
 import { logConversion } from "@/lib/supabaseLogger";
@@ -118,6 +124,7 @@ export const JsonToCsvConverter = memo(() => {
         placeholder="CSV output will appear here..."
         onDownload={handleDownload}
         isCsvOutput={true}
+        showInfoTooltip={true}
       />
       </div>
     </div>

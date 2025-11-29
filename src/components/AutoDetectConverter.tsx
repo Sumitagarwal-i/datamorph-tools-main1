@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, Sparkles, Minimize2, RotateCcw } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles, Minimize2, RotateCcw, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ConverterPanel } from "./ConverterPanel";
 import { csvToJson, jsonToCsv, detectFormat, downloadFile, repairJson } from "@/lib/converters";
 import { logConversion } from "@/lib/supabaseLogger";
@@ -314,6 +320,7 @@ export const AutoDetectConverter = () => {
           onMinify={handleMinify}
           onReset={handleReset}
           isCsvOutput={outputFormat === "CSV"}
+          showInfoTooltip={true}
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles, Table2 } from "lucide-react";
+import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles, Table2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
 import {
@@ -40,6 +40,7 @@ interface ConverterPanelProps {
   showDemoButton?: boolean;
   onDemoLoad?: () => void;
   isCsvOutput?: boolean;
+  showInfoTooltip?: boolean;
 }
 
 export const ConverterPanel = ({
@@ -62,6 +63,7 @@ export const ConverterPanel = ({
   showDemoButton = false,
   onDemoLoad,
   isCsvOutput = false,
+  showInfoTooltip = false,
 }: ConverterPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -183,7 +185,25 @@ export const ConverterPanel = ({
   return (
     <div className="flex flex-col h-full max-w-full overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 max-w-full">
-        <label className="text-xs sm:text-sm font-medium text-foreground truncate max-w-full">{label}</label>
+        <div className="flex items-center gap-2">
+          <label className="text-xs sm:text-sm font-medium text-foreground truncate max-w-full">{label}</label>
+          {showInfoTooltip && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="inline-flex items-center justify-center rounded-full w-5 h-5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/70 transition-colors flex-shrink-0">
+                    <Info className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-700 text-blue-900 dark:text-blue-100">
+                  <p className="text-sm">
+                    <span className="font-medium">ℹ️</span> Complex nested JSON structures may produce some inaccuracies. We're actively working on improvements.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1 sm:gap-1.5">
           {showDemoButton && onDemoLoad && !readOnly && (
             <Button

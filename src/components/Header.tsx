@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Moon, Sun, MessageSquare, Mail, AlertTriangle } from "lucide-react";
+import { Moon, Sun, MessageSquare, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { FeedbackModal } from "./FeedbackModal";
@@ -9,33 +9,9 @@ export const Header = () => {
   const { theme, setTheme } = useTheme();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const [showBanner, setShowBanner] = useState(true);
 
   return (
     <>
-      {/* Warning Banner */}
-      {showBanner && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-3 py-2">
-          <div className="container">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                <p className="text-xs sm:text-sm">
-                  <span className="font-medium">Note:</span> JSON to CSV conversion for complex nested structures may produce unexpected results. We're working on improvements.
-                </p>
-              </div>
-              <button 
-                onClick={() => setShowBanner(false)}
-                className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 text-lg font-medium px-1"
-                aria-label="Dismiss"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <header className="border-b border-border bg-card overflow-x-hidden">
         <div className="container py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 max-w-full">
