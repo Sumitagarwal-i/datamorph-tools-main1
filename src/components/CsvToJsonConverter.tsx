@@ -89,7 +89,7 @@ export const CsvToJsonConverter = memo(() => {
         </p>
       </div>
 
-      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_auto_1fr] gap-4 min-h-[400px] lg:h-[calc(100vh-320px)] max-w-full overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[500px] lg:h-[600px] max-w-full">
         <ConverterPanel
           label="Input CSV"
           value={input}
@@ -98,35 +98,34 @@ export const CsvToJsonConverter = memo(() => {
           allowFileUpload={true}
           acceptedFileTypes=".csv,text/csv"
           isCsvOutput={true}
+          customAction={
+            <Button
+              onClick={handleConvert}
+              disabled={!input.trim() || isConverting}
+              size="sm"
+              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all h-9 px-4"
+            >
+              {isConverting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowRight className="h-4 w-4" />
+              )}
+              <span className="text-xs font-medium">Convert</span>
+            </Button>
+          }
         />
 
-      <div className="flex items-center justify-center order-last lg:order-none py-2 lg:py-0">
-        <Button
-          onClick={handleConvert}
-          disabled={!input.trim() || isConverting}
-          className="gap-2 w-full sm:w-auto"
-          size="lg"
-        >
-          {isConverting ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <ArrowRight className="h-5 w-5" />
-          )}
-          Convert
-        </Button>
-      </div>
-
-      <ConverterPanel
-        label="Output JSON"
-        value={output}
-        readOnly
-        placeholder="JSON output will appear here..."
-        onDownload={handleDownload}
-        showMinify={output && !isMinified}
-        showReset={output && isMinified}
-        onMinify={handleMinify}
-        onReset={handleReset}
-      />
+        <ConverterPanel
+          label="Output JSON"
+          value={output}
+          readOnly
+          placeholder="JSON output will appear here..."
+          onDownload={handleDownload}
+          showMinify={output && !isMinified}
+          showReset={output && isMinified}
+          onMinify={handleMinify}
+          onReset={handleReset}
+        />
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles, Table2, Info } from "lucide-react";
+import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles, Table2, Info, MoreVertical, FileCode, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
 import {
@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface ConverterPanelProps {
   label: string;
@@ -41,6 +42,7 @@ interface ConverterPanelProps {
   onDemoLoad?: () => void;
   isCsvOutput?: boolean;
   showInfoTooltip?: boolean;
+  customAction?: React.ReactNode;
 }
 
 export const ConverterPanel = ({
@@ -64,6 +66,7 @@ export const ConverterPanel = ({
   onDemoLoad,
   isCsvOutput = false,
   showInfoTooltip = false,
+  customAction,
 }: ConverterPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -184,216 +187,285 @@ export const ConverterPanel = ({
 
   return (
     <div className="flex flex-col h-full max-w-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 max-w-full">
-        <div className="flex items-center gap-2">
-          <label className="text-xs sm:text-sm font-medium text-foreground truncate max-w-full">{label}</label>
-          {showInfoTooltip && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button className="inline-flex items-center justify-center rounded-full w-5 h-5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/70 transition-colors flex-shrink-0">
-                    <Info className="h-3 w-3" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-700 text-blue-900 dark:text-blue-100">
-                  <p className="text-sm">
-                    <span className="font-medium">ℹ️</span> Complex nested JSON structures may produce some inaccuracies. We're actively working on improvements.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+      <div className="flex flex-col h-full bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 text-primary">
+              {isCsvOutput ? <FileText className="h-3.5 w-3.5" /> : <FileCode className="h-3.5 w-3.5" />}
+            </div>
+            <span className="text-sm font-semibold text-foreground">{label}</span>
+            {showInfoTooltip && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="inline-flex">
+                      <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-primary cursor-help transition-colors" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="text-sm">
+                      <span className="font-medium">ℹ️</span> Complex nested JSON structures may produce some inaccuracies. We're actively working on improvements.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </div>
+
+        {/* Editor Area */}
+        <div 
+          className="flex-1 relative min-h-[300px] bg-muted/5"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Line Number Track (Visual Only) */}
+          <div className="absolute left-0 top-0 bottom-0 w-12 bg-muted/20 border-r border-border flex flex-col items-center pt-3 gap-[1.15rem] text-[11px] text-muted-foreground/40 font-mono select-none pointer-events-none overflow-hidden z-10">
+            {Array.from({ length: 30 }).map((_, i) => (
+              <span key={i}>{i + 1}</span>
+            ))}
+          </div>
+
+          {isCsvOutput && viewMode === 'table' && value.trim() ? (
+            <div className="absolute inset-0 pl-14 overflow-auto">
+              <div className="min-w-max p-4">
+                {(() => {
+                  const { headers, rows } = parseCsvForTable(value);
+                  if (headers.length === 0) {
+                    return (
+                      <div className="text-center text-muted-foreground py-8">
+                        No data to display
+                      </div>
+                    );
+                  }
+                  return (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {headers.map((header, idx) => (
+                            <TableHead key={idx} className="font-semibold whitespace-nowrap text-xs sticky top-0 bg-background z-10">
+                              {header}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((row, rowIdx) => (
+                          <TableRow key={rowIdx}>
+                            {row.map((cell, cellIdx) => (
+                              <TableCell key={cellIdx} className="font-mono text-xs whitespace-nowrap">
+                                {cell || <span className="text-muted-foreground italic">null</span>}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  );
+                })()}
+              </div>
+            </div>
+          ) : (
+            <div className="absolute inset-0 pl-14">
+              <Textarea
+                value={value}
+                onChange={(e) => onChange?.(e.target.value)}
+                placeholder={placeholder}
+                readOnly={readOnly}
+                className={cn(
+                  "h-full w-full pl-2 pr-4 py-3 font-mono text-sm bg-transparent border-0 shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-0 focus:shadow-none resize-none leading-relaxed rounded-none",
+                  isCsvOutput && "tracking-wide",
+                  readOnly && "cursor-default"
+                )}
+                spellCheck={false}
+              />
+            </div>
+          )}
+
+          {isDragging && (
+            <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm flex items-center justify-center z-20 border-2 border-dashed border-primary m-2 rounded-lg">
+              <div className="text-center">
+                <Upload className="h-10 w-10 mx-auto mb-3 text-primary animate-bounce" />
+                <p className="text-sm font-medium text-primary">Drop file here</p>
+              </div>
+            </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-1 sm:gap-1.5">
-          {showDemoButton && onDemoLoad && !readOnly && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onDemoLoad}
-              className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-            >
-              <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Try Demo Data</span>
-              <span className="sm:hidden">Demo</span>
-            </Button>
-          )}
-          {allowFileUpload && !readOnly && (
-            <>
-              <Input
-                ref={fileInputRef}
-                type="file"
-                accept={acceptedFileTypes}
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-              >
-                <Upload className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Upload</span>
-              </Button>
-            </>
-          )}
-          {showRepair && onRepair && !readOnly && (
-            <TooltipProvider>
-              <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>
-                  <span className="inline-block">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={onRepair}
-                      disabled={!repairEnabled}
-                      className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-                    >
-                      <Wrench className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                      <span className="hidden sm:inline">Repair</span>
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">{repairEnabled ? "Fix broken JSON" : "Input JSON required"}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          {readOnly && value && (
-            <>
-              {showMinify && onMinify && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onMinify}
-                  className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-                >
-                  <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline">Minify</span>
-                </Button>
-              )}
-              {showReset && onReset && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onReset}
-                  className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-                >
-                  <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline">Reset</span>
-                </Button>
-              )}
-              {isCsvOutput && value.trim() && (
+
+        {/* Bottom Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-muted/30 border-t border-border">
+          {/* Left Actions */}
+          <div className="flex items-center gap-2">
+            {allowFileUpload && !readOnly && (
+              <>
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={acceptedFileTypes}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => setViewMode(viewMode === 'text' ? 'table' : 'text')}
-                        className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
+                        variant="ghost"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
                       >
-                        <Table2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <span className="hidden sm:inline">{viewMode === 'text' ? 'Table' : 'Text'}</span>
+                        <Upload className="h-4 w-4" />
+                        <span className="text-xs">Upload</span>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{viewMode === 'text' ? 'View as table' : 'View as text'}</p>
-                    </TooltipContent>
+                    <TooltipContent>Upload File (.json, .csv, .txt)</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopy}
-                className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-              >
-                <Copy className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Copy</span>
-              </Button>
-              {onDownload && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onDownload}
-                  className="gap-1 text-[10px] sm:text-xs px-2 sm:px-3 min-h-[32px]"
-                >
-                  <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline">Download</span>
-                </Button>
-              )}
-            </>
+              </>
+            )}
+
+            {showDemoButton && onDemoLoad && !readOnly && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onDemoLoad}
+                      className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span className="text-xs">Demo</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Load Demo Data</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {showRepair && onRepair && !readOnly && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onRepair}
+                      disabled={!repairEnabled}
+                      className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <Wrench className="h-4 w-4" />
+                      <span className="text-xs">Repair</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Fix broken JSON syntax</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {readOnly && value && (
+              <>
+                {showMinify && onMinify && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={onMinify}
+                          className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          <Minimize2 className="h-4 w-4" />
+                          <span className="text-xs">Minify</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Compress JSON output</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {showReset && onReset && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={onReset}
+                          className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          <span className="text-xs">Reset</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Restore original format</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {isCsvOutput && value.trim() && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setViewMode(viewMode === 'text' ? 'table' : 'text')}
+                          className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          <Table2 className="h-4 w-4" />
+                          <span className="text-xs">{viewMode === 'text' ? 'Table' : 'Text'}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Toggle between table and text view</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCopy}
+                        className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span className="text-xs">Copy</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Copy to clipboard</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {onDownload && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={onDownload}
+                          className="h-9 px-3 gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="text-xs">Download</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download as file</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right Actions (Custom Action like Convert) */}
+          {customAction && (
+            <div className="flex items-center">
+              {customAction}
+            </div>
           )}
         </div>
-      </div>
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`flex-1 relative overflow-hidden rounded-md ${
-          isDragging ? "ring-2 ring-primary ring-offset-2" : ""
-        }`}
-      >
-        {isCsvOutput && viewMode === 'table' && value.trim() ? (
-          <div className="h-full w-full border rounded-md bg-background overflow-auto">
-            <div className="min-w-max p-2">
-              {(() => {
-                const { headers, rows } = parseCsvForTable(value);
-                if (headers.length === 0) {
-                  return (
-                    <div className="text-center text-muted-foreground py-8">
-                      No data to display
-                    </div>
-                  );
-                }
-                return (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {headers.map((header, idx) => (
-                          <TableHead key={idx} className="font-semibold whitespace-nowrap text-xs sticky top-0 bg-background z-10">
-                            {header}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rows.map((row, rowIdx) => (
-                        <TableRow key={rowIdx}>
-                          {row.map((cell, cellIdx) => (
-                            <TableCell key={cellIdx} className="font-mono text-xs whitespace-nowrap">
-                              {cell || <span className="text-muted-foreground italic">null</span>}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                );
-              })()}
-            </div>
-          </div>
-        ) : (
-          <Textarea
-            value={value}
-            onChange={(e) => onChange?.(e.target.value)}
-            placeholder={placeholder}
-            readOnly={readOnly}
-            className={`h-full w-full font-mono text-sm resize-none overflow-auto ${
-              isCsvOutput ? 'leading-relaxed tracking-wide' : ''
-            } ${readOnly ? 'hover:border-input hover:shadow-sm' : ''}`}
-          />
-        )}
-        {isDragging && (
-          <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm rounded-md flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <Upload className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="text-sm font-medium">Drop file here</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

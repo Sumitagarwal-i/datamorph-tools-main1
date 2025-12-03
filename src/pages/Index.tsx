@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { ThemeProvider } from "next-themes";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Shield, Download, Sparkles, Check, Minimize2 } from "lucide-react";
+import { Zap, Shield, Download, Sparkles, Check, Minimize2, FileJson, FileSpreadsheet, Wrench } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { lazy, Suspense, memo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -66,14 +66,38 @@ const Index = () => {
         
         <main className="container pb-6 sm:pb-8 lg:pb-12 pt-6 sm:pt-10 lg:pt-14 max-w-full overflow-x-hidden">
           <Tabs defaultValue="auto-detect" className="w-full max-w-full">
-            <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5 mb-6 sm:mb-8 lg:mb-10 bg-muted/60 dark:bg-muted/30 backdrop-blur-md border border-border/50 p-1 h-auto">
-              <TabsTrigger value="auto-detect" className="gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm py-2 sm:py-2.5 px-2 sm:px-3">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Auto</span>
+            <TabsList className="flex flex-wrap justify-center gap-3 mb-8 bg-transparent p-0 h-auto w-full max-w-4xl mx-auto">
+              <TabsTrigger 
+                value="auto-detect" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:shadow-primary/10 rounded-full px-6 py-3 transition-all duration-300 hover:shadow-sm hover:scale-[1.02] border border-border/50 bg-background/50 backdrop-blur-sm"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Auto Detect
               </TabsTrigger>
-              <TabsTrigger value="csv-to-json" className="text-[10px] sm:text-xs md:text-sm py-2 sm:py-2.5 px-2 sm:px-3"><span className="truncate">CSV→JSON</span></TabsTrigger>
-              <TabsTrigger value="json-to-csv" className="text-[10px] sm:text-xs md:text-sm py-2 sm:py-2.5 px-2 sm:px-3"><span className="truncate">JSON→CSV</span></TabsTrigger>
-              <TabsTrigger value="json-tools" className="text-[10px] sm:text-xs md:text-sm py-2 sm:py-2.5 px-2 sm:px-3"><span className="truncate">Tools</span></TabsTrigger>
+              
+              <TabsTrigger 
+                value="csv-to-json" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:shadow-primary/10 rounded-full px-6 py-3 transition-all duration-300 hover:shadow-sm hover:scale-[1.02] border border-border/50 bg-background/50 backdrop-blur-sm"
+              >
+                <FileJson className="h-4 w-4 mr-2" />
+                CSV → JSON
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="json-to-csv" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:shadow-primary/10 rounded-full px-6 py-3 transition-all duration-300 hover:shadow-sm hover:scale-[1.02] border border-border/50 bg-background/50 backdrop-blur-sm"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                JSON → CSV
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="json-tools" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:shadow-primary/10 rounded-full px-6 py-3 transition-all duration-300 hover:shadow-sm hover:scale-[1.02] border border-border/50 bg-background/50 backdrop-blur-sm"
+              >
+                <Wrench className="h-4 w-4 mr-2" />
+                Tools
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="auto-detect" className="space-y-4 sm:space-y-6 px-2 sm:px-5 md:px-7 lg:px-10">

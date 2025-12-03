@@ -360,7 +360,7 @@ export const DataToolsPanel = () => {
         </Alert>
       )}
 
-      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_auto_1fr] gap-4 min-h-[400px] lg:h-[calc(100vh-360px)] max-w-full overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[500px] lg:h-[600px] max-w-full">
         <ConverterPanel
           label={`Input ${detectedFormat === 'unknown' ? 'Data' : detectedFormat.toUpperCase()}`}
           value={input}
@@ -371,65 +371,49 @@ export const DataToolsPanel = () => {
           showDemoButton={true}
           onDemoLoad={loadDemoData}
           isCsvOutput={detectedFormat === 'csv'}
+          customAction={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={handleBeautify}
+                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                size="sm"
+                className="h-9 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all"
+              >
+                {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Beautify'}
+              </Button>
+              
+              <Button
+                onClick={handleMinify}
+                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                size="sm"
+                variant="outline"
+                className="h-9 px-3 text-xs"
+              >
+                Minify
+              </Button>
+
+              <Button
+                onClick={handleRepair}
+                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                size="sm"
+                variant="outline"
+                className="h-9 px-3 text-xs"
+              >
+                Repair
+              </Button>
+
+              <Button
+                onClick={handleValidate}
+                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                size="sm"
+                variant="outline"
+                className="h-9 px-3 text-xs"
+              >
+                Validate
+              </Button>
+            </div>
+          }
         />
-
-        <div className="flex flex-wrap lg:flex-col items-center justify-center gap-2 sm:gap-3 order-last lg:order-none py-2 lg:py-0">
-          {/* Common actions for both JSON and CSV */}
-          <Button
-            onClick={handleBeautify}
-            disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-full sm:w-32"
-            size="lg"
-          >
-            {isProcessing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              "Beautify"
-            )}
-          </Button>
-          
-          <Button
-            onClick={handleMinify}
-            disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-full sm:w-32"
-            variant="outline"
-            size="lg"
-          >
-            {isProcessing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              "Minify"
-            )}
-          </Button>
-
-          <Button
-            onClick={handleRepair}
-            disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-full sm:w-32"
-            variant="secondary"
-            size="lg"
-          >
-            {isProcessing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              "Repair"
-            )}
-          </Button>
-
-          <Button
-            onClick={handleValidate}
-            disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
-            className="gap-2 w-full sm:w-32"
-            variant="outline"
-            size="lg"
-          >
-            {isProcessing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              "Validate"
-            )}
-          </Button>
-        </div>
 
         <ConverterPanel
           label={`Output ${detectedFormat === 'unknown' ? 'Data' : detectedFormat.toUpperCase()}`}
