@@ -69,8 +69,21 @@ export const ConverterPanel = ({
   customAction,
 }: ConverterPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
+  
+  // Calculate number of lines in the textarea, with minimum to fill visible area
+  const actualLineCount = value ? value.split('\n').length : 1;
+  const lineCount = Math.max(actualLineCount, 25); // Show minimum 25 lines to fill the frame
+  
+  // Sync scroll between textarea and line numbers
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (lineNumbersRef.current && e.currentTarget) {
+      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(value);
@@ -221,11 +234,18 @@ export const ConverterPanel = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Line Number Track (Visual Only) */}
-          <div className="absolute left-0 top-0 bottom-0 w-12 bg-muted/20 border-r border-border flex flex-col items-center pt-3 gap-[1.15rem] text-[11px] text-muted-foreground/40 font-mono select-none pointer-events-none overflow-hidden z-10">
-            {Array.from({ length: 30 }).map((_, i) => (
-              <span key={i}>{i + 1}</span>
-            ))}
+          {/* Dynamic Line Numbers */}
+          <div 
+            ref={lineNumbersRef}
+            className="absolute left-0 top-0 bottom-0 w-12 bg-muted/20 border-r border-border overflow-hidden select-none pointer-events-none z-10"
+          >
+            <div className="py-3 px-2 text-right leading-relaxed text-[13px] text-muted-foreground/50 font-mono">
+              {Array.from({ length: lineCount }).map((_, i) => (
+                <div key={i} style={{ height: '1.5rem' }}>
+                  {i + 1}
+                </div>
+              ))}
+            </div>
           </div>
 
           {isCsvOutput && viewMode === 'table' && value.trim() ? (
@@ -270,8 +290,10 @@ export const ConverterPanel = ({
           ) : (
             <div className="absolute inset-0 pl-14">
               <Textarea
+                ref={textareaRef}
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
+                onScroll={handleScroll}
                 placeholder={placeholder}
                 readOnly={readOnly}
                 className={cn(

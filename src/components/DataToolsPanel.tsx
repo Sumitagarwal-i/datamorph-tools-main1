@@ -117,6 +117,7 @@ export const DataToolsPanel = () => {
   const [isValid, setIsValid] = useState<boolean | null>(null);
   const [validationMessage, setValidationMessage] = useState("");
   const [detectedFormat, setDetectedFormat] = useState<'json' | 'csv' | 'unknown'>('unknown');
+  const [activeAction, setActiveAction] = useState<'beautify' | 'minify' | 'repair' | 'validate' | null>(null);
 
   useEffect(() => {
     const format = detectFormat(input);
@@ -167,11 +168,9 @@ export const DataToolsPanel = () => {
   };
 
   // JSON Actions
-  const handleBeautify = async () => {
+  const handleBeautify = () => {
+    setActiveAction('beautify');
     try {
-      setIsProcessing(true);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
       if (detectedFormat === 'json') {
         const result = beautifyJson(input);
         if (result.success && result.data) {
@@ -194,16 +193,12 @@ export const DataToolsPanel = () => {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
       setOutput("");
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  const handleMinify = async () => {
+  const handleMinify = () => {
+    setActiveAction('minify');
     try {
-      setIsProcessing(true);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
       if (detectedFormat === 'json') {
         const result = minifyJson(input);
         if (result.success && result.data) {
@@ -226,16 +221,12 @@ export const DataToolsPanel = () => {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
       setOutput("");
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  const handleRepair = async () => {
+  const handleRepair = () => {
+    setActiveAction('repair');
     try {
-      setIsProcessing(true);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
       if (detectedFormat === 'json') {
         const result = repairJson(input);
         if (result.success && result.data) {
@@ -262,16 +253,12 @@ export const DataToolsPanel = () => {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
       setOutput("");
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  const handleValidate = async () => {
+  const handleValidate = () => {
+    setActiveAction('validate');
     try {
-      setIsProcessing(true);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
       if (detectedFormat === 'csv') {
         const result = validateCsv(input);
         if (result.success && result.data) {
@@ -295,8 +282,6 @@ export const DataToolsPanel = () => {
         toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
         setOutput("");
       }
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -375,39 +360,56 @@ export const DataToolsPanel = () => {
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={handleBeautify}
-                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                disabled={!input.trim() || detectedFormat === 'unknown'}
                 size="sm"
-                className="h-9 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all"
+                variant="outline"
+                className={`h-9 px-3 text-xs transition-all ${
+                  activeAction === 'beautify' 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : ''
+                }`}
               >
-                {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Beautify'}
+                Beautify
               </Button>
               
               <Button
                 onClick={handleMinify}
-                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                disabled={!input.trim() || detectedFormat === 'unknown'}
                 size="sm"
                 variant="outline"
-                className="h-9 px-3 text-xs"
+                className={`h-9 px-3 text-xs transition-all ${
+                  activeAction === 'minify' 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : ''
+                }`}
               >
                 Minify
               </Button>
 
               <Button
                 onClick={handleRepair}
-                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                disabled={!input.trim() || detectedFormat === 'unknown'}
                 size="sm"
                 variant="outline"
-                className="h-9 px-3 text-xs"
+                className={`h-9 px-3 text-xs transition-all ${
+                  activeAction === 'repair' 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : ''
+                }`}
               >
                 Repair
               </Button>
 
               <Button
                 onClick={handleValidate}
-                disabled={!input.trim() || isProcessing || detectedFormat === 'unknown'}
+                disabled={!input.trim() || detectedFormat === 'unknown'}
                 size="sm"
                 variant="outline"
-                className="h-9 px-3 text-xs"
+                className={`h-9 px-3 text-xs transition-all ${
+                  activeAction === 'validate' 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : ''
+                }`}
               >
                 Validate
               </Button>

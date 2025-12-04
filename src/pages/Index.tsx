@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Zap, Shield, Download, Sparkles, Check, Minimize2, FileJson, FileSpreadsheet, Wrench, Bell, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { lazy, Suspense, memo, useState } from "react";
+import { lazy, Suspense, memo, useState, useEffect } from "react";
 import { NotificationModal } from "@/components/NotificationModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 // Lazy load converter components for better initial load
 const CsvToJsonConverter = lazy(() => import("@/components/CsvToJsonConverter").then(m => ({ default: m.CsvToJsonConverter })));
@@ -50,6 +51,22 @@ BenefitItem.displayName = "BenefitItem";
 
 const Index = () => {
   const [notificationModalOpen, setNotificationModalOpen] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(true);
+
+  // Hide button when banner is in view
+  useEffect(() => {
+    const handleScroll = () => {
+      const banner = document.getElementById('detective-d-banner');
+      if (banner) {
+        const rect = banner.getBoundingClientRect();
+        // Show button only if banner is not visible in viewport
+        setShowScrollButton(rect.top > window.innerHeight || rect.bottom < 0);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
@@ -70,52 +87,6 @@ const Index = () => {
         </div>
         
         <main className="container pb-6 sm:pb-8 lg:pb-12 pt-6 sm:pt-10 lg:pt-14 max-w-full overflow-x-hidden">
-          {/* Detective D Announcement Banner */}
-          <div className="max-w-6xl mx-auto mb-6 sm:mb-7 px-2 sm:px-4">
-            <Card className="relative overflow-hidden bg-gradient-to-br from-[#0c0b10] via-[#0f0e14] to-[#13121a] dark:from-[#0c0b10] dark:via-[#0f0e14] dark:to-[#13121a] bg-gradient-to-br light:from-slate-50 light:via-slate-100 light:to-slate-200 border-slate-700/60 dark:border-slate-700/60 light:border-slate-300 shadow-2xl">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/30 dark:to-black/30 light:to-black/10"></div>
-              <CardContent className="relative p-3 sm:p-4 md:p-5 lg:p-6">
-                {/* Coming Soon badge at top of banner */}
-                <div className="absolute left-3 top-3 sm:left-4 sm:top-4 md:left-6 md:top-4 lg:left-8 lg:top-6 z-20">
-                  <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-full bg-primary/10 border border-primary/20">
-                    <Bell className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary animate-pulse" />
-                    <span className="text-[10px] sm:text-xs font-medium text-primary">Coming Soon</span>
-                  </div>
-                </div>
-                <div className="relative">
-                  {/* Right Image - Absolute positioned to overflow consistently */}
-                  <div className="hidden sm:block absolute inset-0 left-1/2 pointer-events-none overflow-hidden">
-                    <img 
-                      src="/image.png" 
-                      alt="Detective D - AI Agent" 
-                      className="absolute right-[-8%] top-[-140%] md:top-[-135%] lg:top-[-130%] w-[600px] h-[600px] md:w-[760px] md:h-[760px] lg:w-[920px] lg:h-[920px] object-contain drop-shadow-2xl animate-float" 
-                    />
-                  </div>
-
-                  {/* Left Content */}
-                  <div className="relative z-10 py-4 sm:py-6 md:py-8 lg:py-10 min-h-[200px] sm:min-h-[240px] md:min-h-[280px] lg:min-h-[300px] flex flex-col justify-end max-w-[90%] sm:max-w-[55%] lg:max-w-[50%]">
-                    <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-white dark:text-white light:text-slate-900 mb-2 flex flex-wrap items-baseline text-center sm:text-left justify-center sm:justify-start gap-1 sm:gap-0.5">
-                      <span className="inline-flex items-baseline gap-1">Detective <span className="text-primary text-xl sm:text-xl md:text-2xl lg:text-4xl leading-none mr-1 sm:mr-2">D</span></span> <span className="whitespace-nowrap">on the Road,  Arriving Soon</span>
-                    </h2>
-                    <p className="text-slate-300 dark:text-slate-300 light:text-slate-600 text-xs sm:text-xs md:text-sm lg:text-base mb-3 sm:mb-4 text-center sm:text-left">
-                      Your AI agent for deep error detection and smart data repair.
-                    </p>
-                    <div className="flex justify-center sm:justify-start">
-                      <Button 
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 gap-2 group text-xs sm:text-sm"
-                        size="sm"
-                        onClick={() => setNotificationModalOpen(true)}
-                      >
-                        Get Notified
-                        <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           <Tabs defaultValue="auto-detect" className="w-full max-w-full">
             <TabsList className="flex flex-wrap justify-center gap-3 mb-8 bg-transparent p-0 h-auto w-full max-w-4xl mx-auto">
               <TabsTrigger 
@@ -176,6 +147,52 @@ const Index = () => {
             </TabsContent>
           </Tabs>
 
+          {/* Detective D Announcement Banner */}
+          <div id="detective-d-banner" className="max-w-6xl mx-auto my-8 sm:my-10 lg:my-12 px-2 sm:px-4">
+            <Card className="relative overflow-hidden bg-gradient-to-br from-[#0c0b10] via-[#0f0e14] to-[#13121a] dark:from-[#0c0b10] dark:via-[#0f0e14] dark:to-[#13121a] bg-gradient-to-br light:from-slate-50 light:via-slate-100 light:to-slate-200 border-slate-700/60 dark:border-slate-700/60 light:border-slate-300 shadow-2xl">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/30 dark:to-black/30 light:to-black/10"></div>
+              <CardContent className="relative p-3 sm:p-4 md:p-5 lg:p-6">
+                {/* Coming Soon badge at top of banner */}
+                <div className="absolute left-3 top-3 sm:left-4 sm:top-4 md:left-6 md:top-4 lg:left-8 lg:top-6 z-20">
+                  <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-full bg-primary/10 border border-primary/20">
+                    <Bell className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary animate-pulse" />
+                    <span className="text-[10px] sm:text-xs font-medium text-primary">Coming Soon</span>
+                  </div>
+                </div>
+                <div className="relative">
+                  {/* Right Image - Absolute positioned to overflow consistently */}
+                  <div className="hidden sm:block absolute inset-0 left-1/2 pointer-events-none overflow-hidden">
+                    <img 
+                      src="/image.png" 
+                      alt="Detective D - AI Agent" 
+                      className="absolute right-[-8%] top-[-140%] md:top-[-135%] lg:top-[-130%] w-[600px] h-[600px] md:w-[760px] md:h-[760px] lg:w-[920px] lg:h-[920px] object-contain drop-shadow-2xl animate-float" 
+                    />
+                  </div>
+
+                  {/* Left Content */}
+                  <div className="relative z-10 py-4 sm:py-6 md:py-8 lg:py-10 min-h-[200px] sm:min-h-[240px] md:min-h-[280px] lg:min-h-[300px] flex flex-col justify-end max-w-[90%] sm:max-w-[55%] lg:max-w-[50%]">
+                    <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-white dark:text-white light:text-slate-900 mb-2 flex flex-wrap items-baseline text-center sm:text-left justify-center sm:justify-start gap-1 sm:gap-0.5">
+                      <span className="inline-flex items-baseline gap-1">Detective <span className="text-primary text-xl sm:text-xl md:text-2xl lg:text-4xl leading-none mr-1 sm:mr-2">D</span></span> <span className="whitespace-nowrap">on the Road,  Arriving Soon</span>
+                    </h2>
+                    <p className="text-slate-300 dark:text-slate-300 light:text-slate-600 text-xs sm:text-xs md:text-sm lg:text-base mb-3 sm:mb-4 text-center sm:text-left">
+                      Your AI agent for deep error detection and smart data repair.
+                    </p>
+                    <div className="flex justify-center sm:justify-start">
+                      <Button 
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 gap-2 group text-xs sm:text-sm"
+                        size="sm"
+                        onClick={() => setNotificationModalOpen(true)}
+                      >
+                        Get Notified
+                        <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Features List */}
           <section className="mt-10 sm:mt-14 lg:mt-20 max-w-4xl mx-auto px-1 sm:px-4">
             <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-center mb-6 sm:mb-8 lg:mb-10">Why Choose DatumInt?</h2>
@@ -222,6 +239,23 @@ const Index = () => {
               />
             </div>
           </section>
+
+          {/* Scroll to Detective D Button */}
+          <button
+            onClick={() => {
+              const element = document.getElementById('detective-d-banner');
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+            className={cn(
+              "fixed bottom-4 right-0 sm:bottom-6 sm:right-1 md:right-2 lg:right-3 z-50 p-2 sm:p-3 rounded-l-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 group",
+              showScrollButton ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            )}
+            aria-label="Scroll to Detective D announcement"
+          >
+            <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 rotate-90 group-hover:translate-y-1 transition-transform" />
+          </button>
         </main>
 
         <footer className="border-t border-border mt-8 sm:mt-12 lg:mt-16 py-4 sm:py-6">
