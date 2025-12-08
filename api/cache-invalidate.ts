@@ -9,8 +9,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { invalidateAllCache, invalidateCacheByFileType, updateVersion } from './lib/cacheManager.js';
-import { logger, Logger } from './lib/logger.js';
+import { invalidateAllCache, invalidateCacheByFileType, updateVersion } from './_lib/cacheManager.js';
+import { logger, Logger } from './_lib/logger.js';
 import { randomUUID } from 'crypto';
 
 interface InvalidateRequest {

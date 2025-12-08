@@ -4,16 +4,16 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { rateLimiter } from './lib/rateLimiter.js';
-import { requestValidator, handleValidationError } from './lib/requestValidator.js';
-import { logger, Logger } from './lib/logger.js';
-import { retrieveRAGSnippets, formatRAGSnippetsForPrompt, getRAGStatus } from './lib/ragGrounding.js';
-import { callLLM, getProviderInfo } from './lib/llmProvider.js';
+import { rateLimiter } from './_lib/rateLimiter.js';
+import { requestValidator, handleValidationError } from './_lib/requestValidator.js';
+import { logger, Logger } from './_lib/logger.js';
+import { retrieveRAGSnippets, formatRAGSnippetsForPrompt, getRAGStatus } from './_lib/ragGrounding.js';
+import { callLLM, getProviderInfo } from './_lib/llmProvider.js';
 import { randomUUID } from 'crypto';
 import { parse as parseCsv } from 'csv-parse/sync';
 import * as yaml from 'js-yaml';
-import { getCachedAnalysis, cacheAnalysisResult, computeContentHash } from './lib/cacheManager.js';
-import { logTelemetryAsync } from './lib/telemetryLogger.js';
+import { getCachedAnalysis, cacheAnalysisResult, computeContentHash } from './_lib/cacheManager.js';
+import { logTelemetryAsync } from './_lib/telemetryLogger.js';
 
 // Allowed file types
 const ALLOWED_FILE_TYPES = ['auto', 'json', 'csv', 'xml', 'yaml'] as const;

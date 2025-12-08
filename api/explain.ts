@@ -9,10 +9,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { rateLimiter } from './lib/rateLimiter.js';
-import { requestValidator, handleValidationError } from './lib/requestValidator.js';
-import { logger, Logger } from './lib/logger.js';
-import { envManager, requireApiKey } from './lib/envManager.js';
+import { rateLimiter } from './_lib/rateLimiter.js';
+import { requestValidator, handleValidationError } from './_lib/requestValidator.js';
+import { logger, Logger } from './_lib/logger.js';
+import { envManager, requireApiKey } from './_lib/envManager.js';
 
 interface ExplainRequest {
   content: string;

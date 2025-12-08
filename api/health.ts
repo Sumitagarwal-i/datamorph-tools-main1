@@ -5,8 +5,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { envManager } from './lib/envManager.js';
-import { logger, Logger } from './lib/logger.js';
+import { envManager } from './_lib/envManager.js';
+import { logger, Logger } from './_lib/logger.js';
 
 export default async function handler(
   req: VercelRequest,
