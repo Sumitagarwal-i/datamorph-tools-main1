@@ -4,8 +4,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCacheStats } from './lib/cacheManager';
-import { logger } from './lib/logger';
+import { getCacheStats } from './lib/cacheManager.js';
+import { logger } from './lib/logger.js';
 import { randomUUID } from 'crypto';
 
 interface CacheStatsResponse {

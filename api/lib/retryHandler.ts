@@ -3,7 +3,7 @@
  * Handles LLM call retries, timeouts, and fallback strategies
  */
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 export interface RetryConfig {
   maxRetries: number;

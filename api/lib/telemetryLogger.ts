@@ -9,7 +9,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 // Supabase client for analytics
 let supabase: SupabaseClient | null = null;

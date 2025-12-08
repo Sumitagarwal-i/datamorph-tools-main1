@@ -5,7 +5,7 @@
  */
 
 import type { VercelRequest } from '@vercel/node';
-import { logger, Logger } from './logger';
+import { logger, Logger } from './logger.js';
 
 export interface RateLimitConfig {
   requestsPerMinute: number;

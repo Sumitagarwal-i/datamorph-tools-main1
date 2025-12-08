@@ -10,7 +10,7 @@
  */
 
 import { createHash } from 'crypto';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 // ============================================================================
 // Types

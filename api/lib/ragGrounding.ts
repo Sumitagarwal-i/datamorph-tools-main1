@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 // RAG snippet structure
 export interface RAGSnippet {

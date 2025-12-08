@@ -6,12 +6,12 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { logger, Logger } from './lib/logger';
+import { logger, Logger } from './lib/logger.js';
 import { 
   getAnalyticsSummary, 
   getCostSummary, 
   getPerformanceMetrics 
-} from './lib/telemetryLogger';
+} from './lib/telemetryLogger.js';
 import { randomUUID } from 'crypto';
 
 interface ErrorResponse {

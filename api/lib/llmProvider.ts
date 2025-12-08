@@ -5,12 +5,12 @@
  * Includes streaming, retry logic, and error handling
  */
 
-import { logger } from './logger';
-import { buildPrompt, getLLMConfig, validateLLMResponse } from './promptBuilder';
-import type { LLMAnalysisResponse, DetectedError } from './promptBuilder';
-import { normalizeErrorPositions } from './positionMapper';
-import type { TruncationMap } from './positionMapper';
-import { postProcessResponse } from './postProcessor';
+import { logger } from './logger.js';
+import { buildPrompt, getLLMConfig, validateLLMResponse } from './promptBuilder.js';
+import type { LLMAnalysisResponse, DetectedError } from './promptBuilder.js';
+import { normalizeErrorPositions } from './positionMapper.js';
+import type { TruncationMap } from './positionMapper.js';
+import { postProcessResponse } from './postProcessor.js';
 
 // Provider types
 type LLMProvider = 'groq' | 'openai' | 'anthropic';

@@ -6,7 +6,7 @@
  * Includes RAG grounding, parser hints, and truncation context
  */
 
-import type { RAGSnippet } from './ragGrounding';
+import type { RAGSnippet } from './ragGrounding.js';
 
 // File types
 type FileType = 'json' | 'csv' | 'xml' | 'yaml';

@@ -4,7 +4,7 @@
  */
 
 import type { VercelResponse } from '@vercel/node';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 // Standard error object in response
 export interface NormalizedError {

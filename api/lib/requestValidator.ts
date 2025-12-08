@@ -8,7 +8,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 export interface ValidationResult {
   valid: boolean;

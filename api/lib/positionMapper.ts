@@ -5,7 +5,7 @@
  * Handles truncated content, position indices, and approximate line numbers
  */
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 /**
  * Truncation map from analyze.ts
