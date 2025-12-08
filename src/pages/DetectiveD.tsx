@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,7 @@ const defineCustomTheme = (monaco: any) => {
 };
 
 const DetectiveD = () => {
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
@@ -102,6 +103,15 @@ const DetectiveD = () => {
   const [lastValidationTime, setLastValidationTime] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisMode, setAnalysisMode] = useState<'local' | 'ai'>('local');
+
+  // Check authentication on mount
+  useEffect(() => {
+    const isAuthenticated = sessionStorage.getItem("detective_d_auth");
+    if (!isAuthenticated) {
+      toast.error("Access denied. Please enter the developer passcode.");
+      navigate("/");
+    }
+  }, [navigate]);
 
   const handleFileUpload = () => {
     fileInputRef.current?.click();
