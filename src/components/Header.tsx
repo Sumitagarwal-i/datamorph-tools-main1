@@ -28,12 +28,12 @@ export const Header = () => {
             </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => setPasscodeOpen(true)}
-                className="gap-1 px-2 sm:px-3 min-h-[32px] bg-black hover:bg-primary active:bg-primary border-black hover:border-primary text-white hover:text-white font-medium transition-all duration-300"
+                className="gap-2 px-3 sm:px-4 h-9 rounded-full bg-gradient-to-r from-gray-900 to-black hover:from-primary hover:to-primary/90 border border-gray-800 hover:border-primary/50 text-white font-semibold transition-all duration-300 shadow-lg hover:shadow-primary/25 hover:scale-105 active:scale-100"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0 transition-transform duration-300 group-hover:rotate-12">
                   {/* Detective D Logo - Magnifying glass with circuit pattern */}
                   <circle cx="10.5" cy="10.5" r="6" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M15 15L19.5 19.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -43,7 +43,7 @@ export const Header = () => {
                   <circle cx="8" cy="13" r="0.8" fill="currentColor"/>
                   <circle cx="13" cy="13" r="0.8" fill="currentColor"/>
                 </svg>
-                <span className="text-xs">Try Detective D</span>
+                <span className="text-sm tracking-wide">Detective D</span>
               </Button>
               <Button
                 variant="outline"
