@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { FeedbackModal } from "./FeedbackModal";
 import { ContactModal } from "./ContactModal";
+import { Link } from "react-router-dom";
 
 export const Header = () => {
   const { theme, setTheme } = useTheme();
@@ -25,6 +26,25 @@ export const Header = () => {
               </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              <Link to="/detective-d">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 px-2 sm:px-3 min-h-[32px] bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary font-medium transition-all duration-300"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-primary">
+                    {/* Detective D Logo - Magnifying glass with circuit pattern */}
+                    <circle cx="10.5" cy="10.5" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M15 15L19.5 19.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M7.5 10.5H13.5M10.5 7.5V13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    <circle cx="8" cy="8" r="0.8" fill="currentColor"/>
+                    <circle cx="13" cy="8" r="0.8" fill="currentColor"/>
+                    <circle cx="8" cy="13" r="0.8" fill="currentColor"/>
+                    <circle cx="13" cy="13" r="0.8" fill="currentColor"/>
+                  </svg>
+                  <span className="text-xs">Try Detective D</span>
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="sm"

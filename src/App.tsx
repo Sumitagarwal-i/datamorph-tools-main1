@@ -10,6 +10,7 @@ import { Analytics } from "@vercel/analytics/react";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
+const DetectiveD = lazy(() => import("./pages/DetectiveD"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback
@@ -62,6 +63,7 @@ const App = () => {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/detective-d" element={<DetectiveD />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

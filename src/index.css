@@ -189,4 +189,174 @@ All colors MUST be HSL.
     letter-spacing: -0.011em;
     line-height: 1.6;
   }
+
+  /* Monaco Editor fixes for cursor alignment */
+  .monaco-editor {
+    --monaco-monospace-font: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  }
+  
+  .monaco-editor .view-lines {
+    font-variant-ligatures: none !important;
+  }
+
+  /* Syntax Highlighting - Token colors */
+  .monaco-editor .token.string {
+    color: #CE9178 !important;
+  }
+
+  .monaco-editor .token.string.key.json {
+    color: #9CDCFE !important;
+  }
+
+  .monaco-editor .token.keyword {
+    color: #569CD6 !important;
+  }
+
+  .monaco-editor .token.number {
+    color: #B5CEA8 !important;
+  }
+
+  .monaco-editor .token.delimiter.bracket,
+  .monaco-editor .token.delimiter.square,
+  .monaco-editor .token.delimiter.parenthesis {
+    color: #FFA500 !important;
+  }
+
+  .monaco-editor .token.comment {
+    color: #6A9955 !important;
+  }
+
+  .monaco-editor .token.tag {
+    color: #569CD6 !important;
+  }
+
+  .monaco-editor .token.attribute.name {
+    color: #9CDCFE !important;
+  }
+
+  .monaco-editor .token.attribute.value {
+    color: #CE9178 !important;
+  }
+
+  /* CSV Header Highlighting */
+  .csv-header {
+    color: #4EC9B0 !important;
+    font-weight: 600;
+  }
+
+  /* Error highlighting in Monaco Editor */
+  .error-line-highlight {
+    background: rgba(255, 0, 0, 0.10) !important;
+    border-right: 2px solid #FF4D4D !important;
+  }
+
+  .warning-line-highlight {
+    background: rgba(255, 200, 0, 0.07) !important;
+    border-right: 2px solid #EAB308 !important;
+  }
+
+  .error-line-glyph {
+    background: #FF4D4D !important;
+    width: 3px !important;
+  }
+
+  .warning-line-glyph {
+    background: #EAB308 !important;
+    width: 3px !important;
+  }
+
+  /* Bracket pair colorization */
+  .bracket-pair-light-1 {
+    color: #FFA500 !important;
+  }
+
+  .bracket-pair-light-2 {
+    color: #FF6B6B !important;
+  }
+
+  .bracket-pair-light-3 {
+    color: #4ECDC4 !important;
+  }
+
+  /* Matching bracket highlight */
+  .monaco-editor .bracket-match {
+    background-color: rgba(61, 139, 255, 0.2) !important;
+    border: 1px solid #3D8BFF !important;
+  }
+
+  /* Error Summary Panel (A4) - Professional Status Bar */
+  .error-summary-panel {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 36px;
+    background: #0F1113;
+    border-bottom: 1px solid #1C1F22;
+    font-size: 12px;
+    color: #7A7F86;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+  }
+
+  .error-summary-panel:hover {
+    background-color: #151719;
+  }
+
+  .error-summary-panel .summary-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 16px;
+  }
+
+  .error-summary-panel .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .error-summary-panel .status-dot.error {
+    background-color: #FF4D4D;
+    box-shadow: 0 0 4px rgba(255, 77, 77, 0.5);
+  }
+
+  .error-summary-panel .status-dot.warning {
+    background-color: #EAB308;
+    box-shadow: 0 0 4px rgba(234, 179, 8, 0.5);
+  }
+
+  .error-summary-panel .status-dot.valid {
+    background-color: #4EC9B0;
+  }
+
+  .error-summary-panel .count {
+    color: #D0D3D8;
+    font-weight: 500;
+  }
+
+  .error-summary-panel .separator {
+    color: #3E4247;
+    margin: 0 4px;
+  }
+
+  .error-summary-panel .timestamp {
+    margin-left: auto;
+    font-size: 11px;
+    color: #6B7280;
+  }
+
+  /* Right Panel - Error Details Section Dividers */
+  .error-details-section {
+    border-bottom: 1px solid #1C1F22;
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+  }
+
+  .error-details-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
 }

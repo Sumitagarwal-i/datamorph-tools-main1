@@ -8,12 +8,14 @@ interface Metric {
 
 export const reportWebVitals = (onPerfEntry?: (metric: Metric) => void) => {
   if (onPerfEntry && onPerfEntry instanceof Function) {
-    import('web-vitals').then(({ onCLS, onFID, onFCP, onLCP, onTTFB }) => {
+    import('web-vitals').then(({ onCLS, onFCP, onLCP, onTTFB, onINP }) => {
       onCLS(onPerfEntry);
-      onFID(onPerfEntry);
       onFCP(onPerfEntry);
       onLCP(onPerfEntry);
       onTTFB(onPerfEntry);
+      onINP?.(onPerfEntry); // INP replaced FID in newer web-vitals
+    }).catch(() => {
+      // Silently fail if web-vitals not available
     });
   }
 };
