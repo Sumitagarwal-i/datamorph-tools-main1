@@ -31,9 +31,9 @@ export const Header = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setPasscodeOpen(true)}
-                className="gap-1 px-2 sm:px-3 min-h-[32px] bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary font-medium transition-all duration-300"
+                className="gap-1 px-2 sm:px-3 min-h-[32px] bg-black hover:bg-primary active:bg-primary border-black hover:border-primary text-white hover:text-white font-medium transition-all duration-300"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0">
                   {/* Detective D Logo - Magnifying glass with circuit pattern */}
                   <circle cx="10.5" cy="10.5" r="6" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M15 15L19.5 19.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
