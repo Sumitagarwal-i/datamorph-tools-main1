@@ -406,7 +406,7 @@ const DetectiveD = () => {
       console.error('AI analysis failed:', error);
       
       // Handle 413 Content Too Large error
-      if (error.message?.includes('413') || response?.status === 413) {
+      if (error.message?.includes('413')){
         toast.error('File too large for AI analysis', {
           description: `The file exceeds the maximum size limit (${MAX_FILE_SIZE_MB}MB). Try splitting it into smaller files or use local validation.`,
           duration: 6000,

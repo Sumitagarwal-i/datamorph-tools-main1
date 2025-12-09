@@ -149,7 +149,7 @@ const Index = () => {
 
           {/* Detective D Announcement Banner */}
           <div id="detective-d-banner" className="max-w-6xl mx-auto my-8 sm:my-10 lg:my-12 px-2 sm:px-4">
-            <Card className="relative overflow-hidden bg-gradient-to-br from-[#0c0b10] via-[#0f0e14] to-[#13121a] dark:from-[#0c0b10] dark:via-[#0f0e14] dark:to-[#13121a] bg-gradient-to-br light:from-slate-50 light:via-slate-100 light:to-slate-200 border-slate-700/60 dark:border-slate-700/60 light:border-slate-300 shadow-2xl">
+            <Card className="relative overflow-hidden bg-gradient-to-br from-[#0c0b10] via-[#0f0e14] to-[#13121a] dark:from-[#0c0b10] dark:via-[#0f0e14] dark:to-[#13121a] light:from-slate-50 light:via-slate-100 light:to-slate-200 border-slate-700/60 dark:border-slate-700/60 light:border-slate-300 shadow-2xl">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/30 dark:to-black/30 light:to-black/10"></div>
               <CardContent className="relative p-3 sm:p-4 md:p-5 lg:p-6">
                 {/* Coming Soon badge at top of banner */}
