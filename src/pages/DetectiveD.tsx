@@ -18,6 +18,10 @@ interface UploadedFile {
   content: string;
 }
 
+// File size limits
+const MAX_FILE_SIZE_MB = 5; // 5MB limit to stay within Groq API limits (~32K tokens)
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 interface ErrorItem {
   id: string;
   message: string;
@@ -126,9 +130,30 @@ const DetectiveD = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check file size before reading
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast.error(`File too large: ${(file.size / (1024 * 1024)).toFixed(2)}MB`, {
+          description: `Maximum file size is ${MAX_FILE_SIZE_MB}MB. Please use a smaller file or split your data.`,
+          duration: 6000,
+        });
+        e.target.value = '';
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const content = event.target?.result as string;
+        
+        // Double-check content size
+        const contentSizeMB = new Blob([content]).size / (1024 * 1024);
+        if (contentSizeMB > MAX_FILE_SIZE_MB) {
+          toast.error(`Content too large: ${contentSizeMB.toFixed(2)}MB`, {
+            description: `Maximum file size is ${MAX_FILE_SIZE_MB}MB for AI analysis.`,
+            duration: 6000,
+          });
+          return;
+        }
+
         const newFile: UploadedFile = {
           id: Date.now().toString(),
           name: file.name,
@@ -136,6 +161,11 @@ const DetectiveD = () => {
         };
         setUploadedFiles(prev => [...prev, newFile]);
         setActiveFileId(newFile.id);
+        
+        toast.success('File uploaded successfully', {
+          description: `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
+          duration: 3000,
+        });
       };
       reader.readAsText(file);
       // Clear input value to allow re-uploading the same file
@@ -378,7 +408,7 @@ const DetectiveD = () => {
       // Handle 413 Content Too Large error
       if (error.message?.includes('413') || response?.status === 413) {
         toast.error('File too large for AI analysis', {
-          description: 'The file exceeds the maximum size limit (10MB). Try splitting it into smaller files or use local validation.',
+          description: `The file exceeds the maximum size limit (${MAX_FILE_SIZE_MB}MB). Try splitting it into smaller files or use local validation.`,
           duration: 6000,
         });
       } else {
@@ -1047,9 +1077,17 @@ const DetectiveD = () => {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-sm text-[#7A7F86] mb-2">No file selected</div>
-                <div className="text-xs text-[#7A7F86]">Upload a file to start analyzing</div>
+              <div className="text-center px-6 space-y-4">
+                <Upload className="h-12 w-12 text-[#7A7F86] mx-auto mb-3" />
+                <div>
+                  <div className="text-sm text-[#E6E7E9] mb-1 font-medium">No file selected</div>
+                  <div className="text-xs text-[#7A7F86]">Upload a file to start analyzing</div>
+                </div>
+                <div className="pt-3 border-t border-[#1C1F22] text-xs text-[#5A5F66] space-y-1">
+                  <div>📄 Supported: JSON, CSV, XML, YAML</div>
+                  <div>⚡ Max size: <span className="font-semibold text-[#7A7F86]">{MAX_FILE_SIZE_MB}MB</span></div>
+                  <div>🤖 AI analysis available up to 5MB</div>
+                </div>
               </div>
             </div>
           )}
