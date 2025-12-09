@@ -1157,18 +1157,42 @@ const DetectiveD = () => {
                       <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
                         Affected Area
                       </div>
-                      <div className="text-sm text-[#D0D3D8] bg-[#0F1113] rounded px-3 py-2">
-                        Lines {Math.max(1, selectedError.line - 5)}–{selectedError.line}
+                      <div className="text-sm text-[#D0D3D8] bg-[#0F1113] rounded px-3 py-2 font-mono">
+                        {selectedError.occurrences && selectedError.occurrences > 1 
+                          ? `Lines: ${selectedError.affectedLines?.join(', ')}`
+                          : `Line ${selectedError.line}`
+                        }
                       </div>
                     </div>
 
                     {/* Confidence Breakdown */}
                     <div className="error-details-section">
                       <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                        Analysis Confidence
+                        Detection Confidence
                       </div>
-                      <div className="text-sm text-[#D0D3D8] leading-relaxed">
-                        The detection model has {selectedError.confidence || 85}% confidence in this assessment. This level of confidence is based on pattern matching against known error signatures.
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-[#0F1113] rounded-full h-2 overflow-hidden">
+                            <div 
+                              className={`h-full transition-all ${
+                                (selectedError.confidence || 85) >= 90 ? 'bg-green-500' :
+                                (selectedError.confidence || 85) >= 75 ? 'bg-blue-500' :
+                                (selectedError.confidence || 85) >= 60 ? 'bg-yellow-500' :
+                                'bg-orange-500'
+                              }`}
+                              style={{ width: `${selectedError.confidence || 85}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-semibold text-[#E6E7E9] min-w-[45px]">
+                            {selectedError.confidence || 85}%
+                          </span>
+                        </div>
+                        <p className="text-sm text-[#D0D3D8] leading-relaxed">
+                          {selectedError.source === 'ai' 
+                            ? `AI analysis confidence based on semantic understanding, pattern recognition, and best practices validation.`
+                            : `Local parser detection based on syntax rules and format specifications. ${selectedError.confidence && selectedError.confidence >= 95 ? 'High confidence indicates a definite syntax violation.' : ''}`
+                          }
+                        </p>
                       </div>
                     </div>
                   </div>
