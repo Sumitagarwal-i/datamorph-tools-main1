@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2 } from "lucide-react";
+import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -25,6 +25,12 @@ interface ErrorItem {
   category: string;
   line: number;
   confidence?: number;
+  explanation?: string;
+  suggestions?: string[];
+  affectedLines?: number[];
+  occurrences?: number;
+  source: 'local' | 'ai'; // Track whether error is from local parser or AI analysis
+  severity?: 'critical' | 'high' | 'medium' | 'low'; // AI-provided severity
 }
 
 const getFileIcon = (fileName: string) => {
@@ -210,7 +216,8 @@ const DetectiveD = () => {
               type: 'error',
               category: 'Syntax',
               line: line,
-              confidence: 95
+              confidence: 95,
+              source: 'local'
             });
           }
           break;
@@ -227,6 +234,7 @@ const DetectiveD = () => {
               detectedErrors.push({
                 id: `csv-${idx}`,
                 message: `Inconsistent column count`,
+                source: 'local',
                 type: 'warning',
                 category: 'Format',
                 line: idx + 1,
@@ -253,7 +261,8 @@ const DetectiveD = () => {
               type: 'error',
               category: 'Syntax',
               line: line,
-              confidence: 90
+              confidence: 90,
+              source: 'local'
             });
           }
           break;
@@ -267,6 +276,43 @@ const DetectiveD = () => {
     }
 
     return detectedErrors;
+  };
+
+  // Group similar errors occurring on different lines
+  const groupSimilarErrors = (errors: ErrorItem[]): ErrorItem[] => {
+    const errorGroups = new Map<string, ErrorItem>();
+
+    errors.forEach(error => {
+      // Create a key based on message and category (ignore line number)
+      const key = `${error.message}-${error.category}-${error.type}`;
+      
+      if (errorGroups.has(key)) {
+        const existing = errorGroups.get(key)!;
+        // Add line to affected lines
+        if (!existing.affectedLines) {
+          existing.affectedLines = [existing.line];
+        }
+        if (!existing.affectedLines.includes(error.line)) {
+          existing.affectedLines.push(error.line);
+        }
+        existing.occurrences = (existing.occurrences || 1) + 1;
+        // Keep the explanation and suggestions from the first occurrence
+        if (!existing.explanation && error.explanation) {
+          existing.explanation = error.explanation;
+        }
+        if ((!existing.suggestions || existing.suggestions.length === 0) && error.suggestions) {
+          existing.suggestions = error.suggestions;
+        }
+      } else {
+        errorGroups.set(key, {
+          ...error,
+          affectedLines: [error.line],
+          occurrences: 1,
+        });
+      }
+    });
+
+    return Array.from(errorGroups.values()).sort((a, b) => a.line - b.line);
   };
 
   // AI-powered analysis using Phase B backend
@@ -303,16 +349,27 @@ const DetectiveD = () => {
       const result = await response.json();
       
       // Transform API response to ErrorItem format
-      const aiErrors: ErrorItem[] = (result.errors || []).map((err: any, idx: number) => ({
+      const rawErrors: ErrorItem[] = (result.errors || []).map((err: any, idx: number) => ({
         id: `ai-${Date.now()}-${idx}`,
-        message: err.message || 'Unknown error',
-        type: err.type === 'syntax' || err.severity === 'error' ? 'error' : 'warning',
+        message: err.message || err.description || 'Unknown error',
+        type: err.type === 'warning' ? 'warning' : 'error',
         category: err.category || err.type || 'General',
-        line: err.line || 1,
-        confidence: err.confidence || 85,
+        line: err.line || err.position?.line || 1,
+        confidence: typeof err.confidence === 'number' ? err.confidence * 100 : 85,
+        explanation: err.explanation || err.details || '',
+        suggestions: Array.isArray(err.suggestions) 
+          ? err.suggestions.map((s: any) => 
+              typeof s === 'string' ? s : (s.description || s.fix_code || s.code_snippet || '')
+            ).filter(Boolean)
+          : [],
+        source: 'ai',
+        severity: err.severity || 'medium',
       }));
 
-      setErrors(aiErrors);
+      // Group similar errors occurring on different lines
+      const groupedErrors = groupSimilarErrors(rawErrors);
+
+      setErrors(groupedErrors);
       setLastValidationTime(Date.now());
       
     } catch (error) {
@@ -621,13 +678,13 @@ const DetectiveD = () => {
                 variant="default"
                 size="sm"
                 onClick={analyzeWithAI}
-                disabled={isAnalyzing || errors.length === 0}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1 px-3"
-                title={errors.length === 0 ? "Fix errors first to get AI insights" : "Deep AI analysis with RAG (Phase B)"}
+                disabled={isAnalyzing}
+                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground gap-1.5 px-3 shadow-lg shadow-primary/25"
+                title="AI-powered deep analysis - detects issues beyond basic syntax errors"
               >
-                <Wand2 className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                <span className="text-xs font-medium">
-                  {isAnalyzing ? 'Analyzing...' : 'Deep Dive'}
+                <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                <span className="text-xs font-semibold">
+                  {isAnalyzing ? 'AI Analyzing...' : 'Deep Dive (AI)'}
                 </span>
               </Button>
             )}
@@ -731,10 +788,25 @@ const DetectiveD = () => {
           {errors.length > 0 ? (
             <div className="py-1">
               {/* Info Banner */}
-              <div className="px-3 py-2 bg-[#1A1D20] border-b border-[#1C1F22]">
-                <div className="text-xs text-[#5A5F66] space-y-1">
-                  <div className="font-semibold">{errors.filter(e => e.type === 'error').length} errors found</div>
-                  <div>Click "Deep Dive" for AI explanations</div>
+              <div className="px-3 py-2.5 bg-[#1A1D20] border-b border-[#1C1F22]">
+                <div className="text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#E6E7E9]">
+                      {errors.filter(e => e.type === 'error').length} errors found
+                    </span>
+                    {errors.some(e => e.source === 'ai') && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/20 text-primary border border-primary/30">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        AI Enhanced
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[#7A7F86]">
+                    {errors.some(e => e.source === 'ai') 
+                      ? '🔍 AI found issues beyond basic syntax' 
+                      : '💡 Click "Deep Dive" for AI insights'
+                    }
+                  </div>
                 </div>
               </div>
               
@@ -758,11 +830,37 @@ const DetectiveD = () => {
                       <TriangleAlert className="h-3.5 w-3.5 text-[#E6E7E9] mt-0.5 flex-shrink-0" strokeWidth={2} />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-[#E6E7E9] leading-tight">
-                        {error.message}
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium text-[#E6E7E9] leading-tight">
+                          {error.message}
+                        </div>
+                        {error.source === 'ai' && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/20 text-primary border border-primary/30">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            AI
+                          </span>
+                        )}
                       </div>
-                      <div className="text-xs text-[#7A7F86] mt-1">
-                        {error.category} • Line {error.line}
+                      <div className="text-xs text-[#7A7F86] mt-1 flex items-center gap-1.5">
+                        <span>{error.category}</span>
+                        {error.severity && error.source === 'ai' && (
+                          <>
+                            <span>•</span>
+                            <span className={`font-medium ${
+                              error.severity === 'critical' ? 'text-red-400' :
+                              error.severity === 'high' ? 'text-orange-400' :
+                              error.severity === 'medium' ? 'text-yellow-400' :
+                              'text-blue-400'
+                            }`}>
+                              {error.severity}
+                            </span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>{error.occurrences && error.occurrences > 1 
+                          ? `Lines ${error.affectedLines?.join(', ')} (${error.occurrences}×)`
+                          : `Line ${error.line}`
+                        }</span>
                       </div>
                     </div>
                   </div>
@@ -969,19 +1067,56 @@ const DetectiveD = () => {
                   <div className="px-4 py-4 overflow-y-auto flex-1">
                     {/* Error Title Block */}
                     <div className="error-details-section">
-                      <h3 className="text-base font-medium text-[#E6E7E9] mb-2">
-                        {selectedError.message}
-                      </h3>
+                      <div className="flex items-start gap-2 mb-2">
+                        <h3 className="text-base font-medium text-[#E6E7E9] flex-1">
+                          {selectedError.message}
+                        </h3>
+                        {selectedError.source === 'ai' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
+                            <Sparkles className="h-3 w-3" />
+                            AI Detected
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                            Local Parser
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-[#7A7F86] space-y-1">
-                        <div>
+                        <div className="flex flex-wrap items-center gap-x-2">
                           <span className="text-[#9CA3AF] font-medium">{selectedError.category}</span>
-                          <span className="mx-1">•</span>
+                          {selectedError.severity && selectedError.source === 'ai' && (
+                            <>
+                              <span>•</span>
+                              <span className={`font-semibold ${
+                                selectedError.severity === 'critical' ? 'text-red-400' :
+                                selectedError.severity === 'high' ? 'text-orange-400' :
+                                selectedError.severity === 'medium' ? 'text-yellow-400' :
+                                'text-blue-400'
+                              }`}>
+                                {selectedError.severity.toUpperCase()}
+                              </span>
+                            </>
+                          )}
+                          <span>•</span>
                           <span>Line {selectedError.line}</span>
-                          <span className="mx-1">•</span>
+                          <span>•</span>
                           <span>Confidence {selectedError.confidence || 85}%</span>
                         </div>
                       </div>
                     </div>
+
+                    {/* Affected Lines (if grouped) */}
+                    {selectedError.occurrences && selectedError.occurrences > 1 && (
+                      <div className="error-details-section">
+                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
+                          Affected Lines ({selectedError.occurrences})
+                        </div>
+                        <p className="text-sm text-[#D0D3D8] leading-relaxed">
+                          This error occurs on {selectedError.occurrences} different lines: {selectedError.affectedLines?.join(', ')}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Explanation Section */}
                     <div className="error-details-section">
@@ -989,20 +1124,26 @@ const DetectiveD = () => {
                         Explanation
                       </div>
                       <p className="text-sm text-[#D0D3D8] leading-relaxed">
-                        {selectedError.type === 'error' 
-                          ? `A syntax error has been detected at line ${selectedError.line}. This error prevents the file from being parsed correctly. The parser encountered an unexpected token or structure that doesn't conform to the expected format.`
-                          : `A potential issue has been identified at line ${selectedError.line}. While the file may still be valid, this structure could lead to unexpected behavior or parsing issues.`
-                        }
+                        {selectedError.explanation || (
+                          selectedError.type === 'error' 
+                            ? `A syntax error has been detected at line ${selectedError.line}. This error prevents the file from being parsed correctly. The parser encountered an unexpected token or structure that doesn't conform to the expected format.`
+                            : `A potential issue has been identified at line ${selectedError.line}. While the file may still be valid, this structure could lead to unexpected behavior or parsing issues.`
+                        )}
                       </p>
                     </div>
 
                     {/* Suggested Fixes Section */}
                     <div className="error-details-section">
                       <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                        Suggested Fixes ({getSuggestions(selectedError, activeFile.name).length})
+                        Suggested Fixes ({(selectedError.suggestions && selectedError.suggestions.length > 0) 
+                          ? selectedError.suggestions.length 
+                          : getSuggestions(selectedError, activeFile.name).length})
                       </div>
                       <div className="space-y-2">
-                        {getSuggestions(selectedError, activeFile.name).map((suggestion, idx) => (
+                        {(selectedError.suggestions && selectedError.suggestions.length > 0 
+                          ? selectedError.suggestions 
+                          : getSuggestions(selectedError, activeFile.name)
+                        ).map((suggestion, idx) => (
                           <div key={idx} className="text-sm text-[#D0D3D8]">
                             <span className="text-[#7A7F86]">•</span>
                             <span className="ml-2">{suggestion}</span>
