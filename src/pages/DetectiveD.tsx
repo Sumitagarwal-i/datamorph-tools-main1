@@ -372,14 +372,22 @@ const DetectiveD = () => {
       setErrors(groupedErrors);
       setLastValidationTime(Date.now());
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI analysis failed:', error);
       
-      // Show helpful message - API only works when deployed
-      toast.info('API not available in dev mode', {
-        description: 'Deploy to Vercel to enable AI analysis. Using local validation instead.',
-        duration: 4000,
-      });
+      // Handle 413 Content Too Large error
+      if (error.message?.includes('413') || response?.status === 413) {
+        toast.error('File too large for AI analysis', {
+          description: 'The file exceeds the maximum size limit (10MB). Try splitting it into smaller files or use local validation.',
+          duration: 6000,
+        });
+      } else {
+        // Show helpful message - API only works when deployed
+        toast.info('API not available in dev mode', {
+          description: 'Deploy to Vercel to enable AI analysis. Using local validation instead.',
+          duration: 4000,
+        });
+      }
       
       // Fall back to local validation
       const localErrors = validateSyntax(editorContent, activeFile.name);

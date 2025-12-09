@@ -20,10 +20,10 @@ const ALLOWED_FILE_TYPES = ['auto', 'json', 'csv', 'xml', 'yaml'] as const;
 type FileType = typeof ALLOWED_FILE_TYPES[number];
 
 // Truncation configuration
-const LLM_SAFE_CHARS = 12000; // Safe character limit for full content
-const HEAD_CHARS = 6000; // Characters to take from start
-const TAIL_CHARS = 4000; // Characters to take from end
-const ERROR_WINDOW_CHARS = 500; // Characters around error positions (±500)
+const LLM_SAFE_CHARS = 50000; // Safe character limit for full content (increased for large files)
+const HEAD_CHARS = 25000; // Characters to take from start
+const TAIL_CHARS = 20000; // Characters to take from end
+const ERROR_WINDOW_CHARS = 1000; // Characters around error positions (±1000)
 
 // Parser hint interface
 interface ParserHint {

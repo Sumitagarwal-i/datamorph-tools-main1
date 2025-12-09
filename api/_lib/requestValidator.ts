@@ -20,8 +20,8 @@ class RequestValidator {
   private maxTokensPerRequest: number;
 
   constructor() {
-    this.maxSizeMb = parseInt(process.env.MAX_REQUEST_SIZE_MB || '1', 10);
-    this.maxTokensPerRequest = parseInt(process.env.MAX_TOKENS_PER_REQUEST || '4000', 10);
+    this.maxSizeMb = parseInt(process.env.MAX_REQUEST_SIZE_MB || '10', 10);
+    this.maxTokensPerRequest = parseInt(process.env.MAX_TOKENS_PER_REQUEST || '30000', 10);
   }
 
   /**
