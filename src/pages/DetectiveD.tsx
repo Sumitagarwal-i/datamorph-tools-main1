@@ -373,11 +373,11 @@ const DetectiveD = () => {
         fileSize: `${(requestSize / 1024).toFixed(2)}KB`,
         contentLength: editorContent.length,
         fileType,
-        endpoint: 'api/analyze-large', // Try large endpoint first
+        endpoint: 'api/analyze-streaming (primary), fallback to /api/analyze',
       });
 
-      // Try the large-file endpoint first (handles body parsing better)
-      let response = await fetch('/api/analyze-large', {
+      // Try streaming endpoint first (best body parsing)
+      let response = await fetch('/api/analyze-streaming', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -385,9 +385,9 @@ const DetectiveD = () => {
         body: requestBody,
       });
 
-      // If large endpoint fails, try main endpoint
-      if (!response.ok && response.status !== 413) {
-        console.log('analyze-large failed, trying main /api/analyze endpoint');
+      // If streaming fails, try main endpoint
+      if (!response.ok) {
+        console.log('analyze-streaming failed with status', response.status, 'trying main /api/analyze endpoint');
         response = await fetch('/api/analyze', {
           method: 'POST',
           headers: {
@@ -438,13 +438,18 @@ const DetectiveD = () => {
       
       // Handle 413 Content Too Large error
       if (error.message?.includes('413')){
-        toast.error('Request too large (413 error)', {
-          description: `Vercel has a 4.5MB hard limit. Try using a smaller file or split your content. Your file is ~${(editorContent.length / 1024).toFixed(1)}KB.`,
-          duration: 6000,
+        toast.error('Request rejected by server (413)', {
+          description: `Your file is ${(editorContent.length / 1024).toFixed(1)}KB. If still too large, try: 1) Remove comments, 2) Split into smaller files, 3) Check internet connection.`,
+          duration: 7000,
         });
       } else if (error.message?.includes('API error 413')) {
         toast.error('Content size exceeds server limit', {
-          description: 'The server rejected your request due to size. Try a smaller file.',
+          description: 'The server rejected your request. Try removing unnecessary content or splitting the file.',
+          duration: 6000,
+        });
+      } else if (error.message?.includes('API error 500')) {
+        toast.error('Server processing error', {
+          description: 'The backend encountered an error. Please try again or contact support.',
           duration: 6000,
         });
       } else if (error.message?.includes('Failed to fetch')) {
