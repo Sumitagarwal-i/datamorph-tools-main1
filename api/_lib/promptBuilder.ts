@@ -283,6 +283,13 @@ function buildFewShotExamples(fileType: FileType): string {
         analysis_confidence: 1.0
       }, null, 2);
       examples += '\n```\n';
+      examples += '**CRITICAL JSON VALIDATION RULES:**\n';
+      examples += '- Property names must be in double quotes (e.g., "name", not name)\n';
+      examples += '- String values inside quotes are valid and do NOT need additional quotes\n';
+      examples += '- Do NOT report missing quotes on values - values like "key": value are correct if value is a string/number/boolean\n';
+      examples += '- Nested objects {} and arrays [] are allowed and valid\n';
+      examples += '- Report ONLY actual syntax violations: missing braces, unclosed strings, trailing commas, duplicate keys\n';
+      examples += '- Do NOT invent errors for valid JSON structure\n';
       break;
 
     case 'csv':

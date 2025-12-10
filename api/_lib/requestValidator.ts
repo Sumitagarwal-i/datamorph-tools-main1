@@ -20,8 +20,9 @@ class RequestValidator {
   private maxTokensPerRequest: number;
 
   constructor() {
-    this.maxSizeMb = parseInt(process.env.MAX_REQUEST_SIZE_MB || '5', 10); // 5MB matches Groq API limits
-    this.maxTokensPerRequest = parseInt(process.env.MAX_TOKENS_PER_REQUEST || '32000', 10); // Groq supports ~32K tokens
+    // 5MB absolute max for upload, but AI analysis limited to 500KB due to Groq token constraints
+    this.maxSizeMb = parseInt(process.env.MAX_REQUEST_SIZE_MB || '5', 10);
+    this.maxTokensPerRequest = parseInt(process.env.MAX_TOKENS_PER_REQUEST || '2000', 10); // Conservative: ~500KB content = ~2000 tokens
   }
 
   /**
