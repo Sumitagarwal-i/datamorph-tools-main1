@@ -421,7 +421,8 @@ const DetectiveD = () => {
       
       // Fall back to local validation
       const localErrors = validateSyntax(editorContent, activeFile.name);
-      setErrors(localErrors);
+      const groupedLocalErrors = groupSimilarErrors(localErrors);
+      setErrors(groupedLocalErrors);
       setAnalysisMode('local');
     } finally {
       setIsAnalyzing(false);
@@ -440,12 +441,13 @@ const DetectiveD = () => {
     // Debounce validation for 300ms
     const timeoutId = setTimeout(() => {
       const validationErrors = validateSyntax(editorContent, activeFile.name);
-      setErrors(validationErrors);
+      const groupedErrors = groupSimilarErrors(validationErrors);
+      setErrors(groupedErrors);
       setLastValidationTime(Date.now());
       setAnalysisMode('local');
       
       // Clear selected error if it no longer exists
-      if (selectedErrorId && !validationErrors.find(e => e.id === selectedErrorId)) {
+      if (selectedErrorId && !groupedErrors.find(e => e.id === selectedErrorId)) {
         setSelectedErrorId(null);
       }
       
@@ -722,7 +724,7 @@ const DetectiveD = () => {
               >
                 <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
                 <span className="text-xs font-semibold">
-                  {isAnalyzing ? 'AI Analyzing...' : 'Deep Dive (AI)'}
+                  {isAnalyzing ? 'AI Analyzing...' : 'Deep Dive'}
                 </span>
               </Button>
             )}
@@ -841,8 +843,8 @@ const DetectiveD = () => {
                   </div>
                   <div className="text-[#7A7F86]">
                     {errors.some(e => e.source === 'ai') 
-                      ? '🔍 AI found issues beyond basic syntax' 
-                      : '💡 Click "Deep Dive" for AI insights'
+                      ? 'AI found issues beyond basic syntax' 
+                      : 'Click "Deep Dive" for AI insights'
                     }
                   </div>
                 </div>
@@ -1084,9 +1086,9 @@ const DetectiveD = () => {
                   <div className="text-xs text-[#7A7F86]">Upload a file to start analyzing</div>
                 </div>
                 <div className="pt-3 border-t border-[#1C1F22] text-xs text-[#5A5F66] space-y-1">
-                  <div>📄 Supported: JSON, CSV, XML, YAML</div>
-                  <div>⚡ Max size: <span className="font-semibold text-[#7A7F86]">{MAX_FILE_SIZE_MB}MB</span></div>
-                  <div>🤖 AI analysis available up to 5MB</div>
+                  <div>Supported: JSON, CSV, XML, YAML</div>
+                  <div>Max size: <span className="font-semibold text-[#7A7F86]">{MAX_FILE_SIZE_MB}MB</span></div>
+                  <div>AI analysis available up to 5MB</div>
                 </div>
               </div>
             </div>

@@ -14,6 +14,8 @@ import { parse as parseCsv } from 'csv-parse/sync';
 import * as yaml from 'js-yaml';
 import { getCachedAnalysis, cacheAnalysisResult, computeContentHash } from './_lib/cacheManager.js';
 import { logTelemetryAsync } from './_lib/telemetryLogger.js';
+import { buildChunkList, type Chunk } from './_lib/chunkProcessor.js';
+import { aggregateChunkErrors, type AggregationResult } from './_lib/errorAggregator.js';
 
 // Allowed file types
 const ALLOWED_FILE_TYPES = ['auto', 'json', 'csv', 'xml', 'yaml'] as const;
@@ -725,6 +727,104 @@ function validateAnalyzeRequest(body: any): {
 }
 
 /**
+ * Analyze a single chunk with the LLM
+ * Maps line numbers back to original file offsets
+ */
+async function analyzeChunk(
+  chunk: Chunk,
+  fileType: Exclude<FileType, 'auto'>,
+  parserHints: ParserHint[],
+  ragSnippets: any[],
+  requestId: string,
+  fileName?: string
+): Promise<{
+  chunkId: string;
+  errors: Array<{
+    id: string;
+    line: number;
+    column?: number;
+    message: string;
+    type: 'error' | 'warning';
+    category: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    explanation?: string;
+    confidence?: number;
+    suggestions?: any[];
+  }>;
+}> {
+  try {
+    const ragPromptSection = formatRAGSnippetsForPrompt(ragSnippets);
+    
+    // Call LLM for this chunk
+    const chunkResponse = await callLLM({
+      fileType,
+      content: chunk.content,
+      originalContent: chunk.content, // Chunk content is already standalone
+      fileName,
+      parserHints: parserHints.filter(h => {
+        // Only include hints relevant to this chunk
+        if (h.line && (h.line < chunk.startLine || h.line > chunk.endLine)) {
+          return false;
+        }
+        return true;
+      }),
+      ragSnippets,
+      truncationMap: {
+        was_truncated: false,
+        original_length: chunk.content.length,
+        truncated_length: chunk.content.length,
+        head_chars: chunk.content.length,
+        tail_chars: 0,
+        error_windows: [],
+        omitted_ranges: [],
+      },
+      truncationNote: `Analyzing chunk: ${chunk.type} (lines ${chunk.startLine}-${chunk.endLine})`,
+      maxErrors: 20, // Per-chunk limit
+      stream: false,
+      requestId: `${requestId}-${chunk.id}`,
+    });
+
+    if (!chunkResponse.success || !chunkResponse.data) {
+      return {
+        chunkId: chunk.id,
+        errors: [],
+      };
+    }
+
+    // Adjust line numbers from chunk space to original file space
+    const adjustedErrors = chunkResponse.data.errors
+      .filter((err: any) => err.id !== undefined && err.id !== null)
+      .map((err: any) => ({
+        id: err.id || `${chunk.id}-${Math.random()}`,
+        line: err.line ? err.line + chunk.startLine - 1 : chunk.startLine,
+        column: err.column,
+        message: err.message,
+        type: err.type as 'error' | 'warning',
+        category: err.category,
+        severity: (err.severity as 'critical' | 'high' | 'medium' | 'low') || 'medium',
+        explanation: err.explanation,
+        confidence: err.confidence || 0.7,
+        suggestions: err.suggestions,
+      }));
+
+    return {
+      chunkId: chunk.id,
+      errors: adjustedErrors,
+    };
+  } catch (err) {
+    logger.error(`Chunk analysis failed for ${chunk.id}`, err instanceof Error ? err : new Error(String(err)), {
+      request_id: requestId,
+      chunk_id: chunk.id,
+    });
+    
+    return {
+      chunkId: chunk.id,
+      errors: [],
+    };
+  }
+}
+
+/**
  * Main handler for /api/analyze
  */
 export default async function handler(
@@ -882,19 +982,15 @@ export default async function handler(
       });
     }
 
-    // Apply truncation/sampling strategy for large files
-    const truncationResult = truncateContent(requestData.content, parserHints);
-
-    // Log truncation info
-    if (truncationResult.truncation_map.was_truncated) {
-      logger.info('Content truncated for LLM processing', {
-        request_id: requestId,
-        original_length: truncationResult.truncation_map.original_length,
-        truncated_length: truncationResult.truncation_map.truncated_length,
-        error_windows: truncationResult.truncation_map.error_windows.length,
-        omitted_ranges: truncationResult.truncation_map.omitted_ranges.length,
-      });
-    }
+    // Build smart chunks for large files (chunking strategy)
+    const chunks = buildChunkList(requestData.content, parserHints);
+    
+    logger.info('Built chunk list for analysis', {
+      request_id: requestId,
+      content_length: contentLength,
+      chunks_count: chunks.length,
+      chunk_types: chunks.map(c => `${c.type}(${c.startLine}-${c.endLine})`).join(', '),
+    });
 
     // Retrieve RAG snippets for grounding
     const errorContext = parserHints.map(h => h.message).join(' ');
@@ -921,6 +1017,7 @@ export default async function handler(
       content_length: contentLength,
       max_errors: requestData.max_errors,
       stream: requestData.stream,
+      chunks_count: chunks.length,
     });
 
     // Add rate limit headers
@@ -970,152 +1067,97 @@ export default async function handler(
       res.status(200).json(cachedResult);
     }
 
-    logger.debug('Cache miss - proceeding with LLM analysis', {
+    logger.debug('Cache miss - proceeding with chunked LLM analysis', {
       request_id: requestId,
       content_hash: contentHash,
+      chunks_count: chunks.length,
     });
 
-    // Call LLM for error analysis
-    let llmResponse;
+    // Analyze each chunk in parallel
+    let chunkAnalyses: Array<{ chunkId: string; errors: any[] }> = [];
     try {
-      llmResponse = await callLLM({
-        fileType: finalFileType,
-        content: truncationResult.content,
-        originalContent: requestData.content,  // Pass original content for position mapping
-        fileName: requestData.file_name,
-        parserHints,
-        ragSnippets,
-        truncationMap: truncationResult.truncation_map,
-        truncationNote: truncationResult.prompt_note,
-        maxErrors: requestData.max_errors,
-        stream: requestData.stream,
-        requestId,
+      const chunkPromises = chunks.map(chunk =>
+        analyzeChunk(chunk, finalFileType, parserHints, ragSnippets, requestId, requestData.file_name)
+      );
+      
+      chunkAnalyses = await Promise.all(chunkPromises);
+
+      logger.info('All chunks analyzed successfully', {
+        request_id: requestId,
+        chunks_analyzed: chunkAnalyses.length,
+        total_errors: chunkAnalyses.reduce((sum, c) => sum + c.errors.length, 0),
       });
-    } catch (llmError) {
-      // Check if this is a parse error with structured data
-      let parseErrorData: any = null;
-      if (llmError instanceof Error) {
-        try {
-          parseErrorData = JSON.parse(llmError.message);
-        } catch {
-          // Not a structured error, continue with generic handling
-        }
-      }
+    } catch (chunkError) {
+      logger.error('Chunk analysis failed', chunkError instanceof Error ? chunkError : new Error(String(chunkError)), {
+        request_id: requestId,
+      });
+      
+      // Return precheck errors as fallback
+      const fallbackErrors = parserHints.map((hint, idx) => ({
+        line: hint.line || 1,
+        column: hint.column,
+        message: hint.message,
+        type: 'error' as const,
+        category: hint.category || 'syntax',
+        severity: 'medium' as const,
+      }));
 
-      // Get RAG status for response
       const ragStatus = getRAGStatus();
-      const providerInfo = getProviderInfo();
+      const fallbackResponse: AnalyzeResponse = {
+        request_id: requestId,
+        file_name: requestData.file_name,
+        file_type: finalFileType,
+        ...(detectedFileType && { detected_file_type: detectedFileType }),
+        is_structured: isStructured,
+        content_length: contentLength,
+        parser_hints: parserHints,
+        ...(ragSnippets.length > 0 && {
+          rag_snippets: ragSnippets.map(s => ({
+            id: s.id,
+            title: s.title,
+            category: s.category,
+          })),
+        }),
+        errors: fallbackErrors,
+        summary: {
+          total_errors: fallbackErrors.length,
+          total_warnings: 0,
+          analysis_time_ms: Date.now() - startTime,
+          rag_loaded: ragStatus.loaded,
+        },
+      };
 
-      if (parseErrorData && parseErrorData.type === 'llm_parse_error') {
-        // LLM returned unparseable JSON - return parse error with raw output and parserHints
-        logger.error('LLM parse error - returning parserHints as fallback', undefined, {
-          request_id: requestId,
-          parse_error: parseErrorData.message,
-          raw_output_length: parseErrorData.raw_llm_output?.length,
-          precheck_hints: parserHints.length,
-        });
-
-        // Convert parserHints to error format for fallback
-        const fallbackErrors = parserHints.map((hint, idx) => ({
-          line: hint.line || 1,
-          column: hint.column,
-          message: hint.message,
-          type: 'error' as const,
-          category: hint.category || 'syntax',
-          severity: 'medium' as const,
-        }));
-
-        const parseErrorResponse: AnalyzeResponse = {
-          request_id: requestId,
-          file_name: requestData.file_name,
-          file_type: finalFileType,
-          ...(detectedFileType && { detected_file_type: detectedFileType }),
-          is_structured: isStructured,
-          content_length: contentLength,
-          parser_hints: parserHints,
-          ...(truncationResult.truncation_map.was_truncated && { 
-            truncation_map: truncationResult.truncation_map 
-          }),
-          ...(ragSnippets.length > 0 && {
-            rag_snippets: ragSnippets.map(s => ({
-              id: s.id,
-              title: s.title,
-              category: s.category,
-            })),
-          }),
-          errors: fallbackErrors,
-          summary: {
-            total_errors: fallbackErrors.length,
-            total_warnings: 0,
-            analysis_time_ms: Date.now() - startTime,
-            rag_loaded: ragStatus.loaded,
-          },
-          llm_status: 'parse_error' as any,
-          llm_parse_error: parseErrorData.message,
-          raw_llm_output: parseErrorData.raw_llm_output,
-        };
-
-        res.setHeader('X-Response-Time', `${Date.now() - startTime}ms`);
-        res.setHeader('X-LLM-Status', 'parse-error');
-        res.setHeader('X-Fallback-Mode', 'prechecks-only');
-        res.status(200).json(parseErrorResponse);
-      }
-
-      if (parseErrorData && parseErrorData.type === 'schema_validation_error') {
-        // LLM returned valid JSON but schema validation failed
-        logger.error('LLM schema validation error - returning parserHints as fallback', undefined, {
-          request_id: requestId,
-          validation_errors: parseErrorData.validation_errors,
-          precheck_hints: parserHints.length,
-        });
-
-        const fallbackErrors = parserHints.map((hint, idx) => ({
-          line: hint.line || 1,
-          column: hint.column,
-          message: hint.message,
-          type: 'error' as const,
-          category: hint.category || 'syntax',
-          severity: 'medium' as const,
-        }));
-
-        const validationErrorResponse: AnalyzeResponse = {
-          request_id: requestId,
-          file_name: requestData.file_name,
-          file_type: finalFileType,
-          ...(detectedFileType && { detected_file_type: detectedFileType }),
-          is_structured: isStructured,
-          content_length: contentLength,
-          parser_hints: parserHints,
-          ...(truncationResult.truncation_map.was_truncated && { 
-            truncation_map: truncationResult.truncation_map 
-          }),
-          ...(ragSnippets.length > 0 && {
-            rag_snippets: ragSnippets.map(s => ({
-              id: s.id,
-              title: s.title,
-              category: s.category,
-            })),
-          }),
-          errors: fallbackErrors,
-          summary: {
-            total_errors: fallbackErrors.length,
-            total_warnings: 0,
-            analysis_time_ms: Date.now() - startTime,
-            rag_loaded: ragStatus.loaded,
-          },
-          llm_status: 'validation_error' as any,
-          schema_validation_errors: parseErrorData.validation_errors,
-        };
-
-        res.setHeader('X-Response-Time', `${Date.now() - startTime}ms`);
-        res.setHeader('X-LLM-Status', 'validation-error');
-        res.setHeader('X-Fallback-Mode', 'prechecks-only');
-        res.status(200).json(validationErrorResponse);
-      }
-
-      // Generic LLM error - rethrow to be handled by outer catch
-      throw llmError;
+      res.setHeader('X-Response-Time', `${Date.now() - startTime}ms`);
+      res.setHeader('X-Chunk-Analysis-Failed', 'true');
+      res.status(200).json(fallbackResponse);
+      return;
     }
+
+    // Aggregate and deduplicate errors from all chunks
+    const errorsByChunk = chunkAnalyses.map(analysis => ({
+      chunkId: analysis.chunkId,
+      errors: analysis.errors.map(e => ({
+        id: e.id,
+        type: e.type === 'warning' ? 'warning' : 'error',
+        line: e.line,
+        column: e.column,
+        message: e.message,
+        category: e.category,
+        severity: e.severity || 'medium',
+        explanation: e.explanation,
+        confidence: e.confidence || 0.7,
+        suggestions: e.suggestions,
+        sources: [e.chunk_id || analysis.chunkId],
+      })),
+    }));
+
+    const llmResponse: any = {
+      success: true,
+      data: {
+        errors: errorsByChunk.flatMap(ec => ec.errors),
+        total_errors: errorsByChunk.flatMap(ec => ec.errors).length,
+      },
+    };
 
     // Get RAG status for response
     const ragStatus = getRAGStatus();
@@ -1132,9 +1174,6 @@ export default async function handler(
         is_structured: isStructured,
         content_length: contentLength,
         ...(parserHints.length > 0 && { parser_hints: parserHints }),
-        ...(truncationResult.truncation_map.was_truncated && { 
-          truncation_map: truncationResult.truncation_map 
-        }),
         ...(ragSnippets.length > 0 && {
           rag_snippets: ragSnippets.map(s => ({
             id: s.id,
@@ -1142,7 +1181,7 @@ export default async function handler(
             category: s.category,
           })),
         }),
-        errors: llmResponse.data.errors.map(err => ({
+        errors: llmResponse.data.errors.map((err: any) => ({
           id: err.id,
           line: err.line,
           column: err.column,
@@ -1158,7 +1197,7 @@ export default async function handler(
         })),
         summary: {
           total_errors: llmResponse.data.total_errors,
-          total_warnings: llmResponse.data.errors.filter(e => e.type === 'warning').length,
+          total_warnings: llmResponse.data.errors.filter((e: any) => e.type === 'warning').length,
           analysis_time_ms: Date.now() - startTime,
           rag_loaded: ragStatus.loaded,
           ...(llmResponse.sanity_checks_passed !== undefined && {
@@ -1189,7 +1228,7 @@ export default async function handler(
         provider: providerInfo.provider,
         model: providerInfo.model,
         errors_found: llmResponse.data.total_errors,
-        warnings_found: llmResponse.data.errors.filter(e => e.type === 'warning').length,
+        warnings_found: llmResponse.data.errors.filter((e: any) => e.type === 'warning').length,
         sanity_checks_passed: llmResponse.sanity_checks_passed,
         sanity_checks_failed: llmResponse.sanity_checks_failed,
         latency: Date.now() - startTime,
@@ -1213,7 +1252,7 @@ export default async function handler(
         timestamp: new Date().toISOString(),
         file_type: finalFileType,
         content_length: contentLength,
-        was_truncated: truncationResult.truncation_map.was_truncated,
+        was_truncated: false,
         max_errors_requested: requestData.max_errors,
         llm_provider: providerInfo.provider,
         llm_model: providerInfo.model,
@@ -1246,9 +1285,6 @@ export default async function handler(
         is_structured: isStructured,
         content_length: contentLength,
         ...(parserHints.length > 0 && { parser_hints: parserHints }),
-        ...(truncationResult.truncation_map.was_truncated && { 
-          truncation_map: truncationResult.truncation_map 
-        }),
         ...(ragSnippets.length > 0 && {
           rag_snippets: ragSnippets.map(s => ({
             id: s.id,
@@ -1285,7 +1321,7 @@ export default async function handler(
         timestamp: new Date().toISOString(),
         file_type: finalFileType,
         content_length: contentLength,
-        was_truncated: truncationResult.truncation_map.was_truncated,
+        was_truncated: false,
         max_errors_requested: requestData.max_errors,
         llm_provider: providerInfo.provider,
         llm_model: providerInfo.model,
