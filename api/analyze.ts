@@ -1385,10 +1385,4 @@ export default async function handler(
   }
 }
 
-// Vercel configuration for handling larger payloads
-export const config = {
-  memory: 3008, // Increase to 3GB (max for Vercel)
-  maxDuration: 60, // Increase timeout to 60 seconds
-};
-
 

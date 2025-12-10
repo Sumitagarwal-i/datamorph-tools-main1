@@ -19,9 +19,9 @@ export const config = {
 // Helper to read raw body
 async function getRawBody(req: VercelRequest): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
+    const chunks: any[] = [];
     
-    req.on('data', (chunk: Buffer) => {
+    req.on('data', (chunk: any) => {
       chunks.push(chunk);
     });
     
@@ -43,7 +43,8 @@ export default async function handler(
 
   try {
     if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method not allowed' });
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
     }
 
     // Get raw body
@@ -55,10 +56,11 @@ export default async function handler(
       const bodyString = rawBody.toString('utf-8');
       parsedBody = JSON.parse(bodyString);
     } catch (parseError) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         error: 'Invalid JSON in request body',
         request_id: requestId,
       });
+      return;
     }
 
     // Log request details
@@ -73,10 +75,11 @@ export default async function handler(
 
     // Validate request
     if (!parsedBody.content || typeof parsedBody.content !== 'string') {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         error: 'Missing or invalid content field',
         request_id: requestId,
       });
+      return;
     }
 
     // Forward to main analyze endpoint with parsed body
@@ -95,7 +98,8 @@ export default async function handler(
 
     if (!analyzeResponse.ok) {
       const errorData = await analyzeResponse.json();
-      return res.status(analyzeResponse.status).json(errorData);
+      res.status(analyzeResponse.status).json(errorData);
+      return;
     }
 
     const result = await analyzeResponse.json();
@@ -104,11 +108,11 @@ export default async function handler(
     res.setHeader('X-Analysis-Endpoint', 'analyze-large');
     res.setHeader('X-Request-ID', requestId);
     
-    return res.status(200).json(result);
+    res.status(200).json(result);
   } catch (error: any) {
     console.error('[analyze-large] Error:', error);
     
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Internal server error',
       message: error?.message || 'Unknown error',
       request_id: requestId,
