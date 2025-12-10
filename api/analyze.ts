@@ -19,7 +19,7 @@ import { aggregateChunkErrors, type AggregationResult } from './_lib/errorAggreg
 
 // Vercel configuration for handling large payloads
 export const config = {
-  memory: 3008, // 3GB (max for Vercel)
+  memory: 2048, // Max for Vercel Hobby plan
   maxDuration: 60, // 60 second timeout
 };
 
