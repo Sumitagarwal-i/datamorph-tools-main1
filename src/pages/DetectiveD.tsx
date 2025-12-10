@@ -360,20 +360,37 @@ const DetectiveD = () => {
       else if (extension === 'xml') fileType = 'xml';
       else if (extension === 'yaml' || extension === 'yml') fileType = 'yaml';
 
+      const requestPayload = {
+        content: editorContent,
+        file_type: fileType,
+        file_name: activeFile.name,
+      };
+      
+      const requestBody = JSON.stringify(requestPayload);
+      const requestSize = new Blob([requestBody]).size;
+      
+      console.log('Sending AI analysis request', {
+        fileSize: `${(requestSize / 1024).toFixed(2)}KB`,
+        contentLength: editorContent.length,
+        fileType,
+      });
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          content: editorContent,
-          fileType: fileType,
-          fileName: activeFile.name,
-        }),
+        body: requestBody,
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('API response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        });
+        throw new Error(`API error ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
@@ -407,14 +424,24 @@ const DetectiveD = () => {
       
       // Handle 413 Content Too Large error
       if (error.message?.includes('413')){
-        toast.error('File too large for AI analysis', {
-          description: `The file exceeds the maximum size limit (${MAX_FILE_SIZE_MB}MB). Try splitting it into smaller files or use local validation.`,
+        toast.error('Request too large (413 error)', {
+          description: `Vercel has a 4.5MB hard limit. Try using a smaller file or split your content. Your file is ~${(editorContent.length / 1024).toFixed(1)}KB.`,
+          duration: 6000,
+        });
+      } else if (error.message?.includes('API error 413')) {
+        toast.error('Content size exceeds server limit', {
+          description: 'The server rejected your request due to size. Try a smaller file.',
+          duration: 6000,
+        });
+      } else if (error.message?.includes('Failed to fetch')) {
+        toast.error('Network error - check your connection', {
+          description: 'The request was blocked or your connection was interrupted.',
           duration: 6000,
         });
       } else {
         // Show helpful message - API only works when deployed
-        toast.info('API not available in dev mode', {
-          description: 'Deploy to Vercel to enable AI analysis. Using local validation instead.',
+        toast.info('AI analysis unavailable', {
+          description: 'Check your internet connection or try again later. Local validation is still available.',
           duration: 4000,
         });
       }

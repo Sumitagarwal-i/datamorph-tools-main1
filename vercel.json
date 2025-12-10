@@ -8,6 +8,9 @@
       "memory": 1024
     }
   },
+  "env": {
+    "MAX_REQUEST_SIZE_MB": "4"
+  },
   "rewrites": [
     {
       "source": "/(.*)",
