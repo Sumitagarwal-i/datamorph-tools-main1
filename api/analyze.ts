@@ -17,6 +17,12 @@ import { logTelemetryAsync } from './_lib/telemetryLogger.js';
 import { buildChunkList, type Chunk } from './_lib/chunkProcessor.js';
 import { aggregateChunkErrors, type AggregationResult } from './_lib/errorAggregator.js';
 
+// Vercel configuration for handling large payloads
+export const config = {
+  memory: 3008, // 3GB (max for Vercel)
+  maxDuration: 60, // 60 second timeout
+};
+
 // Allowed file types
 const ALLOWED_FILE_TYPES = ['auto', 'json', 'csv', 'xml', 'yaml'] as const;
 type FileType = typeof ALLOWED_FILE_TYPES[number];

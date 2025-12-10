@@ -373,15 +373,29 @@ const DetectiveD = () => {
         fileSize: `${(requestSize / 1024).toFixed(2)}KB`,
         contentLength: editorContent.length,
         fileType,
+        endpoint: 'api/analyze-large', // Try large endpoint first
       });
 
-      const response = await fetch('/api/analyze', {
+      // Try the large-file endpoint first (handles body parsing better)
+      let response = await fetch('/api/analyze-large', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: requestBody,
       });
+
+      // If large endpoint fails, try main endpoint
+      if (!response.ok && response.status !== 413) {
+        console.log('analyze-large failed, trying main /api/analyze endpoint');
+        response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: requestBody,
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
