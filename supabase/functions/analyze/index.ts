@@ -307,19 +307,6 @@ Each error must have:
 - suggestions: array of suggested fixes (string[])
 
 Return ONLY the JSON array, no other text.`
-  {
-    "line": 3,
-    "column": null,
-    "message": "Row has 4 columns, expected 5",
-    "type": "error",
-    "category": "structure",
-    "severity": "high",
-    "explanation": "This row has fewer columns than the header. The header has 5 fields but this row only has 4 values.",
-    "suggestions": ["Add missing column value", "Fix the row to match header structure"]
-  }
-]
-
-Return ONLY valid JSON array, no other text.`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
