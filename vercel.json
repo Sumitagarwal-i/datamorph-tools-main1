@@ -2,15 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 60,
-      "memory": 2048
-    }
-  },
-  "env": {
-    "MAX_REQUEST_SIZE_MB": "4"
-  },
   "rewrites": [
     {
       "source": "/(.*)",
