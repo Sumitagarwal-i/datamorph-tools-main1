@@ -312,15 +312,28 @@ FOCUS ON DATA QUALITY, NOT SYNTAX. The file structure is already validated.`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
 JSON SEMANTIC VALIDATION (syntax already validated locally):
-1. Data Type Validation: Check if fields have correct types (e.g., "age": "25" should be number, not string)
-2. Required Fields: Check if objects are missing expected fields (e.g., user without "email")
-3. Value Validation: Check for impossible values (e.g., "age": -5, "quantity": 0 when shouldn't be zero)
-4. Enum Validation: Check if status/category fields have invalid values (e.g., status: "unknown" when should be "active"|"inactive")
-5. ID References: Check if referenced IDs exist (e.g., "user_id": 999 when users only go to 100)
-6. Cross-field Logic: Check field relationships (e.g., "discount_percent" is 150 which exceeds 100%)
-7. Date Logic: Check date relationships (e.g., "end_date" is before "start_date")
 
-FOCUS ON DATA QUALITY AND LOGIC, NOT SYNTAX. The JSON structure is already validated.`
+ONLY report errors for ACTUAL PROBLEMS:
+❌ WRONG: "age": "twenty-five" (should be number)
+❌ WRONG: "age": -5 (impossible value)
+❌ WRONG: "discount_percent": 150 (exceeds 100%)
+❌ WRONG: "end_date": "2020-01-01", "start_date": "2021-01-01" (end before start)
+
+DO NOT report errors for VALID data:
+✅ VALID: "quantity": 1, "unit": "gallon" (quantity with unit is fine)
+✅ VALID: "quantity": 2, "unit": "loaves" (any unit string is acceptable)
+✅ VALID: "quantity": 1, "unit": "dozen" (dozen is a valid unit)
+✅ VALID: "quantity": 2, "unit": "lbs" (pounds is valid unit)
+✅ VALID: Different objects can have different units
+✅ VALID: Small or large quantities are acceptable unless context suggests otherwise
+
+VALIDATION FOCUS:
+1. Data Type Errors: String where number expected, or vice versa
+2. Impossible Values: Negative ages/prices/quantities, percentages > 100%
+3. Missing Critical Fields: User without ID, product without name (if context requires)
+4. Logic Errors: end_date before start_date, withdrawal > balance
+
+IF THE DATA LOOKS REASONABLE, RETURN []. Do not invent consistency rules.`
   } else if (fileType.toLowerCase() === 'xml') {
     specificInstructions = `
 XML SEMANTIC VALIDATION (syntax already validated locally):
@@ -364,11 +377,12 @@ ${specificInstructions}
 
 VALIDATION APPROACH:
 1. Assume the file structure is syntactically correct
-2. Look for DATA QUALITY issues: wrong types, impossible values, missing data
-3. Check LOGICAL RELATIONSHIPS between fields
-4. Validate BUSINESS RULES and constraints
-5. If data quality is good, return empty array []
-6. Maximum 10 most critical semantic errors only
+2. Look ONLY for ACTUAL PROBLEMS: wrong types, impossible values, broken logic
+3. Do NOT invent consistency rules or requirements
+4. If data looks reasonable and makes sense, return []
+5. Maximum 10 most critical REAL semantic errors only
+
+CRITICAL: Any quantity/unit combination is valid. Do NOT report "unit not consistent with quantity" - that's not an error.
 
 Remember: You're checking DATA QUALITY, not syntax. Be intelligent and accurate.
 
