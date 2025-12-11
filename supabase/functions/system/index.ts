@@ -24,7 +24,7 @@ serve(async (req) => {
           version: '1.0.0',
           services: {
             database: 'ok',
-            llm: process.env.GROQ_API_KEY ? 'configured' : 'not_configured',
+            llm: Deno.env.get('GROQ_API_KEY') ? 'configured' : 'not_configured',
           },
         }),
         {
