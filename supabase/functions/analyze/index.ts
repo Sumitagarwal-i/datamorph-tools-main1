@@ -345,27 +345,50 @@ ${contentPreview}
 
 ${specificInstructions}
 
-Return your analysis as a JSON array of error objects. IMPORTANT: If you find NO issues, return an empty array: []
+IMPORTANT - Return your analysis as a VALID JSON array with NO TRAILING COMMAS:
+[
+  {
+    "line": 1,
+    "column": null,
+    "message": "error description",
+    "type": "error",
+    "category": "syntax",
+    "severity": "critical",
+    "explanation": "detailed explanation",
+    "suggestions": ["fix 1", "fix 2"]
+  }
+]
 
-Each error must have:
-- line: line number where the error occurs (number, 1-indexed)
-- column: column number if known (number or null)
-- message: brief error description (string, max 50 chars)
-- type: "error" or "warning" (string)
-- category: one of "syntax", "structure", "format", "validation", "inconsistency" (string)
-- severity: "critical", "high", "medium", or "low" (string)
-- explanation: detailed explanation of the issue (string)
-- suggestions: array of suggested fixes (string[])
-
-Return ONLY the JSON array, no other text.`
+Rules for your response:
+- Return ONLY valid JSON array (no extra text before or after)
+- NO trailing commas after last item
+- NO comments in JSON
+- Use double quotes for all strings
+- If NO errors found, return empty array: []
+- Each error object must have all required fields
+- Keep messages under 50 characters
+- severity must be: critical, high, medium, or low
+- type must be: error or warning
+- category must be: syntax, structure, format, validation, or inconsistency`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
   try {
-    // Try to extract JSON from the response
+    // Try to extract JSON array from the response
     const jsonMatch = llmResponse.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0])
+    if (!jsonMatch) {
+      logger.warn('[parser] No JSON array found in response', {
+        response_length: llmResponse.length,
+        response_preview: llmResponse.substring(0, 200),
+      })
+      return []
+    }
+
+    let jsonString = jsonMatch[0]
+    
+    // Try direct parse first
+    try {
+      const parsed = JSON.parse(jsonString)
       if (Array.isArray(parsed)) {
         return parsed.map((err, idx) => ({
           id: `error-${idx}`,
@@ -380,12 +403,51 @@ function parseErrorsFromLLM(llmResponse: string): any[] {
           suggestions: Array.isArray(err.suggestions) ? err.suggestions : [],
         }))
       }
+    } catch (parseError: any) {
+      // If direct parse fails, try to fix common issues
+      logger.debug('[parser] Direct JSON parse failed, attempting recovery', {
+        error: parseError?.message,
+        position: parseError?.message?.match(/position (\d+)/)?.[1],
+      })
+
+      // Try to fix common JSON issues
+      try {
+        // Remove trailing commas before closing brackets/braces
+        let fixedJson = jsonString.replace(/,(\s*[\]}])/g, '$1')
+        
+        // Try parsing the fixed version
+        const parsed = JSON.parse(fixedJson)
+        if (Array.isArray(parsed)) {
+          logger.info('[parser] Successfully recovered from malformed JSON', {
+            original_length: jsonString.length,
+            fixed_length: fixedJson.length,
+          })
+          return parsed.map((err, idx) => ({
+            id: `error-${idx}`,
+            line: err.line || 1,
+            column: err.column || null,
+            message: err.message || 'Unknown error',
+            type: err.type || 'error',
+            category: err.category || 'general',
+            severity: err.severity || 'medium',
+            explanation: err.explanation || '',
+            confidence: 0.85,
+            suggestions: Array.isArray(err.suggestions) ? err.suggestions : [],
+          }))
+        }
+      } catch (recoveryError) {
+        logger.error('[parser] Recovery from malformed JSON failed', {
+          original_error: parseError?.message,
+          recovery_error: (recoveryError as any)?.message,
+          response_preview: jsonString.substring(0, 300),
+        })
+      }
     }
     
-    logger.error('[parser] Could not parse LLM response as JSON')
+    logger.error('[parser] Could not parse LLM response as valid JSON array')
     return []
   } catch (err) {
-    logger.error('[parser] Error parsing LLM response', err)
+    logger.error('[parser] Unexpected error in parseErrorsFromLLM', err)
     return []
   }
 }
