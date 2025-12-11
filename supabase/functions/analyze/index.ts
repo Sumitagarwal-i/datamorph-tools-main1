@@ -204,17 +204,17 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: `You are a STRICT and THOROUGH data file validator. Your job is to find and report EVERY single issue in the file, no matter how small. 
-            
-Be exhaustive:
-- Check every single line
-- Check every field/value  
-- Verify formatting and structure
-- Look for type mismatches
-- Find missing or extra values
-- Report EVERYTHING you find
+            content: `You are an expert data file validator. Your job is to ACCURATELY identify real errors and issues in files.
 
-You MUST return valid JSON array format ONLY. Even if file is perfect, return empty array []. Never return anything else.`
+IMPORTANT RULES:
+- Only report ACTUAL errors that exist in the content
+- Do NOT invent or hallucinate errors
+- Verify each error before reporting it
+- If file is valid, return empty array []
+- Be precise and factual, not overly aggressive
+- Double-check your findings before including them
+
+Return ONLY valid JSON array format.`
           },
           {
             role: 'user',
@@ -222,7 +222,7 @@ You MUST return valid JSON array format ONLY. Even if file is perfect, return em
           }
         ],
         temperature: 0.1,
-        max_tokens: 4000, // Increased to handle more errors without truncation
+        max_tokens: 2000, // Reduced to force LLM to be concise and stop at 10 errors
       }),
     })
 
@@ -290,34 +290,26 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
   
   if (fileType.toLowerCase() === 'csv') {
     specificInstructions = `
-CRITICAL CHECKS FOR CSV (MUST REPORT ALL):
-1. COUNT columns in header row - note this number
-2. COUNT columns in EVERY sample row shown - check if they match header count
-3. REPORT each row that has DIFFERENT column count than header
-4. REPORT rows with missing columns (fewer than header)
-5. REPORT rows with extra columns (more than header)
-6. Check for inconsistent data types in each column (numbers mixed with text)
-7. Check for malformed quoted fields - quotes not properly escaped
-8. Check for duplicate rows or duplicate headers
-9. Check for empty rows in the middle of data
-10. Look for trailing commas or missing commas between fields
+CSV VALIDATION - Report ONLY actual errors:
+1. Count columns in header row
+2. For each sample row, count columns and compare to header
+3. Report rows that have different column count than header
+4. Check for obviously malformed quoted fields (unclosed quotes)
+5. Check for data type mismatches (text where numbers expected)
 
-IMPORTANT: The samples shown represent a full file. If you see inconsistencies in samples, assume they repeat throughout.
-YOU MUST CHECK EVERY SAMPLE ROW AND REPORT INCONSISTENCIES. This is critical. If header has 5 columns, check that every row also has 5 columns.`
+IMPORTANT: Verify each error by counting. Do NOT report false positives.`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
-CRITICAL CHECKS FOR JSON (MUST REPORT ALL):
-1. Validate JSON syntax - ALL brackets and braces must match
-2. Check ALL strings are properly quoted with double quotes
-3. Check ALL object keys are properly quoted with double quotes
-4. CHECK for trailing commas in objects/arrays - these are ERRORS
-5. Check for missing commas between key-value pairs
-6. Check for inconsistent data types in similar fields (type mismatches)
-7. Look for duplicate keys in objects - flag as errors
-8. Validate all values are properly formatted and escaped
-9. Check for unescaped special characters like \\ and \"
+JSON VALIDATION - Report ONLY actual errors:
+1. Parse the JSON mentally - if it parses correctly, don't report syntax errors
+2. Check for ACTUAL trailing commas (comma before } or ])
+3. Check for ACTUAL missing commas (two items with no comma between)
+4. Verify all keys are quoted with double quotes
+5. Verify all strings use double quotes (not single)
+6. Check for duplicate keys in same object
+7. Verify brackets/braces are balanced
 
-YOU MUST be exhaustive. If you see a comma after a closing bracket/brace, report it as error.`
+IMPORTANT: Verify each error exists before reporting. Do NOT report false positives.`
   } else if (fileType.toLowerCase() === 'xml') {
     specificInstructions = `
 CRITICAL CHECKS FOR XML (MUST REPORT ALL):
@@ -333,7 +325,9 @@ CRITICAL CHECKS FOR XML (MUST REPORT ALL):
 YOU MUST check every element. If an opening tag <item> has no matching </item>, report it.`
   }
   
-  return `You are a strict data validator. Analyze this ${fileType.toUpperCase()} file and identify ALL errors, warnings, and structural issues. Be thorough and report every problem you find.
+  return `You are an expert data validator. Analyze this ${fileType.toUpperCase()} file and identify ONLY REAL errors that actually exist.
+
+CRITICAL: Be ACCURATE, not aggressive. Only report errors you can verify in the content shown.
 
 File: ${fileName}
 Type: ${fileType}${rulesContext}
@@ -345,36 +339,38 @@ ${contentPreview}
 
 ${specificInstructions}
 
-IMPORTANT - Return your analysis as a VALID JSON array with NO TRAILING COMMAS.
-Limit your response to the TOP 20 most critical errors to avoid truncation.
+VALIDATION RULES - FOLLOW EXACTLY:
+- First, CHECK if the content is actually valid before reporting errors
+- ONLY report errors that truly exist in the content
+- Do NOT report errors you cannot directly see in the content
+- If content is valid (all syntax correct, proper structure), return empty array []
+- Maximum 10 most critical REAL errors only
+- Verify each error exists before including it
 
-Example format:
+Example format (return ONLY this structure):
 [
   {
     "line": 1,
     "column": null,
-    "message": "error description",
+    "message": "Short error desc",
     "type": "error",
     "category": "syntax",
     "severity": "critical",
-    "explanation": "detailed explanation",
-    "suggestions": ["fix 1", "fix 2"]
+    "explanation": "Brief explanation",
+    "suggestions": ["fix"]
   }
 ]
 
-Rules for your response:
-- Return ONLY the TOP 20 most important/critical errors
-- Return ONLY valid JSON array (no extra text before or after)
-- NO trailing commas after last item
-- NO comments in JSON
-- Use double quotes for all strings (never single quotes)
-- If NO errors found, return empty array: []
-- Each error object must have all required fields
-- Keep messages under 50 characters
-- severity must be: critical, high, medium, or low
-- type must be: error or warning
-- category must be: syntax, structure, format, validation, or inconsistency
-- Close all JSON properly - ensure every { has } and every [ has ]`
+ABSOLUTE RULES:
+- Maximum 10 error objects
+- Use ONLY double quotes
+- NO trailing commas
+- NO text before [ or after ]
+- Close every { with } and every [ with ]
+- If NO errors found, return: []
+- severity: critical|high|medium|low
+- type: error|warning  
+- category: syntax|structure|format|validation|inconsistency`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
@@ -421,41 +417,41 @@ function parseErrorsFromLLM(llmResponse: string): any[] {
 
       // Try multiple recovery strategies
       const recoveryStrategies = [
-        // Strategy 1: Remove trailing commas
-        (json: string) => json.replace(/,(\s*[\]}])/g, '$1'),
-        
-        // Strategy 2: Fix truncated response - remove incomplete last object
+        // Strategy 1: Fix truncated response - find last COMPLETE object
         (json: string) => {
-          // Check if response is truncated (doesn't end with ])
           if (!json.trim().endsWith(']')) {
-            logger.info('[parser] Detected truncated response, removing incomplete last object')
-            // Find the last complete object by finding the last '},'
-            const lastCompleteObject = json.lastIndexOf('},')
-            if (lastCompleteObject > 0) {
-              // Remove everything after the last complete object and close the array
-              return json.substring(0, lastCompleteObject + 1) + '\n]'
-            } else {
-              // No complete objects found, try to find at least one closing brace
-              const lastBrace = json.lastIndexOf('}')
-              if (lastBrace > 0) {
-                return json.substring(0, lastBrace + 1) + '\n]'
-              }
+            logger.info('[parser] Truncated response detected - finding last complete object')
+            // Look for last '},' or '}\n' pattern (complete object followed by comma or newline)
+            const lastCompletePattern = json.lastIndexOf('},')
+            if (lastCompletePattern > 0) {
+              return json.substring(0, lastCompletePattern + 1) + '\n]'
+            }
+            // Try finding just last complete '}'
+            const lastBrace = json.lastIndexOf('}')
+            if (lastBrace > 0) {
+              return json.substring(0, lastBrace + 1) + '\n]'
             }
           }
           return json
         },
         
-        // Strategy 3: Fix single quotes to double quotes
+        // Strategy 2: Remove trailing commas
+        (json: string) => json.replace(/,(\s*[\]}])/g, '$1'),
+        
+        // Strategy 3: Fix single quotes to double quotes globally
         (json: string) => json.replace(/'/g, '"'),
         
-        // Strategy 4: Fix missing quotes around property names
-        (json: string) => json.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3'),
-        
-        // Strategy 5: Remove any text before/after the JSON array
+        // Strategy 4: Fix missing closing brackets for truncated suggestions array
         (json: string) => {
-          const match = json.match(/\[[\s\S]*\]/)
-          return match ? match[0] : json
+          // If ends with incomplete suggestions like: ["fix" or ["fix",'
+          if (/\["[^"]*"[,']?$/.test(json.trim())) {
+            return json.trim().replace(/[,']$/, '') + ']\n}\n]'
+          }
+          return json
         },
+        
+        // Strategy 5: Fix missing quotes around property names
+        (json: string) => json.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3'),
       ]
 
       for (let i = 0; i < recoveryStrategies.length; i++) {
