@@ -204,29 +204,23 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: `You are a DATA QUALITY VALIDATOR. Find ONLY real data quality issues, not syntax errors.
+            content: `You are a DATA QUALITY VALIDATOR. Analyze ONLY the content provided in the user message.
 
-✅ REAL SEMANTIC ERRORS (report these):
-- Type mismatch: "age": "twenty" (should be number)
-- Impossible value: "age": -5 (negative age)
-- Logic error: "end_date": "2020-01-01", "start_date": "2021-01-01" (end before start)
-- Missing critical field: user object without "email" or "id"
-- Reference error: "user_id": 999 when max user_id is 100
+YOUR JOB:
+- Find data type mismatches (text where numbers expected)
+- Find impossible values (negative where should be positive)
+- Find logical contradictions between fields
+- Find missing required data based on context
 
-❌ NOT ERRORS (do NOT report these):
-- Valid values: "quantity": 1, "quantity": 2, "quantity": 0 are ALL valid unless context requires otherwise
-- Valid units: "lbs", "gallon", "dozen", "loaves" are ALL valid units
-- Unit-quantity pairs: "1 gallon", "2 loaves", "1 dozen" are ALL perfectly valid
-- Different units in array: items can have different units ("lbs", "gallon", "dozen" in same list is FINE)
+RULES:
+1. ONLY analyze the actual content shown in the user message
+2. Do NOT report errors from instruction examples
+3. Do NOT invent consistency requirements
+4. Valid data includes: any quantity (0,1,2,etc), any unit string (lbs, gallon, dozen, etc)
+5. If content is valid, return empty array []
+6. When unsure, return [] instead of guessing
 
-🎯 CRITICAL RULES:
-1. Read values EXACTLY as shown - do NOT misread numbers
-2. Do NOT invent rules about "unit consistency" or "quantity patterns"
-3. Units and quantities are independent - any unit works with any quantity
-4. If you cannot find a REAL data quality issue, return []
-5. When in doubt, return [] instead of guessing
-
-Return ONLY valid JSON array format.`
+Return ONLY valid JSON array format: [] or [{error objects}]`
           },
           {
             role: 'user',
@@ -302,28 +296,25 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
   
   if (fileType.toLowerCase() === 'csv') {
     specificInstructions = `
-CSV SEMANTIC VALIDATION - Find REAL data quality issues only:
+CSV DATA QUALITY CHECKS:
+- Numeric columns should contain only numbers (not text)
+- Check for impossible values (negatives where shouldn't be)
+- Check calculated fields match their components
+- Different rows can have different units/formats (this is normal)
+- Various quantity values are all valid (0, 1, 2, etc.)
 
-✅ REPORT: age column has "twenty" (should be number like 20)
-✅ REPORT: price column has -50 (negative price)
-✅ REPORT: total_price is 100 but quantity(2) × unit_price(30) = 60 (mismatch)
-❌ DO NOT REPORT: Different units in different rows (this is NORMAL)
-❌ DO NOT REPORT: Various quantity values (0, 1, 2, etc. are all valid)
-
-Only report if you see ACTUAL impossible/wrong values.`
+Report ONLY actual data quality problems you find in the content below.`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
-JSON SEMANTIC VALIDATION - Find REAL data quality issues only:
+JSON DATA QUALITY CHECKS:
+- Check if numeric fields contain text instead of numbers
+- Check for impossible values (negatives where shouldn't be, percentages over 100)
+- Check logical relationships (end dates before start dates)
+- Check missing critical fields based on context
+- Note: Any quantity/unit combination is valid
+- Note: Different objects can have different field values/units
 
-✅ REPORT: "age": "twenty" (should be number like 20)
-✅ REPORT: "age": -5 (negative age is impossible)
-✅ REPORT: "discount_percent": 150 (exceeds 100%)
-❌ DO NOT REPORT: "quantity": 0, 1, or 2 (all valid numbers)
-❌ DO NOT REPORT: "unit": "lbs", "gallon", "dozen", "loaves" (all valid strings)
-❌ DO NOT REPORT: Items with different units (this is NORMAL)
-
-READ VALUES EXACTLY - do not misread numbers.
-Only report ACTUAL impossible/wrong values you can see.`
+Report ONLY actual data quality problems you find in the content below.`
   } else if (fileType.toLowerCase() === 'xml') {
     specificInstructions = `
 XML SEMANTIC VALIDATION (syntax already validated locally):
@@ -350,45 +341,24 @@ YAML SEMANTIC VALIDATION (syntax already validated locally):
 FOCUS ON DATA QUALITY AND SEMANTICS, NOT SYNTAX. The YAML structure is already validated.`
   }
   
-  return `You are a SEMANTIC DATA VALIDATOR. Your ONLY job: find OBVIOUS data quality problems.
+  return `Analyze the following ${fileType.toUpperCase()} content for data quality issues.
 
-⚠️ CRITICAL RULES - READ CAREFULLY:
-1. Read all values EXACTLY as shown - do NOT misread numbers
-2. "quantity": 1 and "unit": "gallon" is PERFECTLY VALID (do NOT report this)
-3. "quantity": 2 and "unit": "loaves" is PERFECTLY VALID (do NOT report this)  
-4. "quantity": 1 and "unit": "dozen" is PERFECTLY VALID (do NOT report this)
-5. ANY unit works with ANY quantity - this is NORMAL data
-6. Different items can have different units - this is NORMAL
-7. Quantity values of 0, 1, 2, 3, etc. are ALL valid
+File: ${fileName}${rulesContext}
 
-✅ ONLY REPORT THESE:
-- Type mismatch: "age": "twenty" (should be number)
-- Impossible value: "age": -5 (negative)
-- Logic error: end_date before start_date
-- Calculation error: total doesn't match sum
-
-❌ NEVER REPORT THESE:
-- "Unit not consistent with quantity" (this is NOT an error)
-- Different units in same array (this is NORMAL)
-- Any valid quantity-unit pair
-
-File: ${fileName}
-Type: ${fileType}${rulesContext}
-
-Content:
-\`\`\`
+--- CONTENT TO ANALYZE ---
 ${contentPreview}
-\`\`\`
+--- END CONTENT ---
 
 ${specificInstructions}
 
-🎯 YOUR TASK:
-1. Read values EXACTLY - do NOT misread numbers
-2. Look ONLY for OBVIOUS problems: wrong types, impossible values
-3. If all data is reasonable, return []
-4. Maximum 10 errors only
-
-IF YOU ARE UNSURE, RETURN [] INSTEAD OF GUESSING.
+IMPORTANT INSTRUCTIONS:
+1. Analyze ONLY the content shown above between the markers
+2. Read all values exactly as written
+3. Look for: wrong data types, impossible values, logical errors
+4. Do NOT report: valid quantities, valid units, normal variations
+5. If content is valid, return empty array: []
+6. Maximum 10 most critical errors
+7. When in doubt, return []`
 
 Example output format (ONLY return this JSON array structure):
 [
@@ -412,7 +382,8 @@ RESPONSE FORMAT RULES:
 - If NO semantic errors found, return: []
 - severity: critical|high|medium|low
 - type: error|warning  
-- category: data_quality|logic|validation|inconsistency|missing_data`
+- category: data_quality|logic|validation|inconsistency|missing_data
+- if no ERRORS , RETURN `
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
