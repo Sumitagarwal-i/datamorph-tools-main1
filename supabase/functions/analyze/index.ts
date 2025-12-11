@@ -204,7 +204,17 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert data file validator. Analyze files and return errors in JSON format. Be thorough and report ALL issues found.'
+            content: `You are a STRICT and THOROUGH data file validator. Your job is to find and report EVERY single issue in the file, no matter how small. 
+            
+Be exhaustive:
+- Check every single line
+- Check every field/value  
+- Verify formatting and structure
+- Look for type mismatches
+- Find missing or extra values
+- Report EVERYTHING you find
+
+You MUST return valid JSON array format ONLY. Even if file is perfect, return empty array []. Never return anything else.`
           },
           {
             role: 'user',
@@ -212,7 +222,7 @@ async function callGroqAPI(
           }
         ],
         temperature: 0.1,
-        max_tokens: 2000,
+        max_tokens: 3000,
       }),
     })
 
