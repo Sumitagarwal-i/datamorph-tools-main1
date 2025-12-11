@@ -150,40 +150,9 @@ async function callGroqAPI(
       return { errors: [] }
     }
 
-    // Fetch validation rules from Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
-    
-    let rulesContext = ''
-    if (supabaseUrl && supabaseAnonKey) {
-      try {
-        const supabase = createClient(supabaseUrl, supabaseAnonKey)
-        const { data: rules, error: rulesError } = await supabase
-          .from('vw_active_rules')
-          .select('rule_name,rule_description,rule_example,common_mistake,fix_suggestion,severity')
-          .eq('file_type', fileType.toLowerCase())
-          .order('severity', { ascending: false })
-
-        if (!rulesError && rules && rules.length > 0) {
-          rulesContext = '\n\nVALIDATION RULES FOR THIS FILE TYPE:\n'
-          rulesContext += rules
-            .slice(0, 15) // Limit to top 15 rules to avoid prompt bloat
-            .map((rule: any) => 
-              `- [${rule.severity.toUpperCase()}] ${rule.rule_name}: ${rule.rule_description}`
-            )
-            .join('\n')
-
-          logger.info('[rules] Loaded validation rules', {
-            request_id: requestId,
-            file_type: fileType,
-            rule_count: rules.length,
-          })
-        }
-      } catch (err: any) {
-        logger.debug('[rules] Failed to load rules from Supabase', err?.message)
-        // Continue without rules if fetch fails
-      }
-    }
+    // DISABLED: Supabase rules loading - causes LLM confusion with examples
+    // Using ultra-minimal prompts instead for accuracy
+    const rulesContext = ''
 
     const prompt = buildPrompt(content, fileType, fileName, rulesContext)
     
@@ -204,39 +173,31 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: `You are a DATA QUALITY VALIDATOR. Your job: analyze the user's data file and find ONLY real data quality issues.
+            content: `You are a data validator. Find ONLY OBVIOUS problems:
 
-🎯 WHAT TO REPORT:
-- Type mismatches: Text where numbers expected, or vice versa
-- Impossible values: Negative ages/prices, percentages over 100%, invalid dates
-- Logic errors: End dates before start dates, totals that don't match sums
-- Missing critical data: Required fields that are empty or null
+✅ REPORT ONLY:
+- Text in numeric fields (age: "twenty")
+- Negative values (age: -5, price: -100)
+- Impossible percentages (discount: 150%)
+- Date logic errors (end before start)
 
-❌ DO NOT REPORT:
-- Valid numeric values (any positive number is valid unless context says otherwise)
-- Valid string values (any unit name, any text is valid)
-- Different units across items (items naturally have different units)
-- Any data that looks reasonable and normal
+❌ NEVER REPORT:
+- Shopping lists with items/quantities/units (ALL VALID)
+- Any positive numbers (1, 2, 3, etc. are ALL VALID)
+- Any text strings ("lbs", "gallon" are ALL VALID)  
+- Data that looks normal
 
-⚠️ CRITICAL INSTRUCTIONS:
-1. ONLY analyze the content provided in the user message
-2. Do NOT report examples or test data from instructions
-3. Read values EXACTLY - do not misread or misinterpret
-4. If the user's data looks normal and valid, return empty array: []
-5. Do NOT invent errors or consistency rules
-6. When unsure, return [] instead of guessing
+🚨 IF DATA LOOKS NORMAL, RETURN: []
 
-🚨 IF THERE ARE NO REAL ERRORS IN THE DATA, YOU MUST RETURN: []
-
-Return ONLY valid JSON array format.`
+Return JSON array only.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.1,
-        max_tokens: 2000, // Reduced to force LLM to be concise and stop at 10 errors
+        temperature: 0, // Maximum determinism
+        max_tokens: 1000, // Minimal - force brevity
       }),
     })
 
@@ -300,108 +261,28 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
     contentPreview = content.length > maxPreviewLength ? content.substring(0, maxPreviewLength) + '\n...[truncated]' : content
   }
   
-  let specificInstructions = ''
+  const specificInstructions = 'If this is a shopping list, inventory, or similar normal data structure, return [].'
   
-  if (fileType.toLowerCase() === 'csv') {
-    specificInstructions = `
-CSV SEMANTIC VALIDATION:
-Look for: Text in numeric columns, negative values where impossible, calculation mismatches.
-Do NOT report: Different units, various quantities (all normal).
-If all data looks valid, return [].`
-  } else if (fileType.toLowerCase() === 'json') {
-    specificInstructions = `
-JSON SEMANTIC VALIDATION:
-Look for: Text where numbers expected, negative values where impossible, percentages over 100%.
-Do NOT report: Valid numbers, valid strings, different units across items (all normal).
-If all data looks valid, return [].`
-  } else if (fileType.toLowerCase() === 'xml') {
-    specificInstructions = `
-XML SEMANTIC VALIDATION (syntax already validated locally):
-1. Data Type Validation: Check if numeric fields contain text (e.g., <age>twenty</age> should be number)
-2. Required Elements: Check if mandatory child elements are missing
-3. Value Validation: Check for impossible values (e.g., <price>-10</price>)
-4. Attribute Values: Check if attributes have valid values (e.g., status="unknown" when should be defined)
-5. ID References: Check if IDREF attributes reference existing IDs
-6. Cross-element Logic: Check relationships between elements (e.g., quantity and total match)
-7. Namespace Usage: Check if namespaces are used consistently
-
-FOCUS ON DATA QUALITY AND SEMANTICS, NOT SYNTAX. The XML structure is already validated.`
-  } else if (fileType.toLowerCase() === 'yaml') {
-    specificInstructions = `
-YAML SEMANTIC VALIDATION (syntax already validated locally):
-1. Data Type Validation: Check if values have correct types (e.g., age: "25" should be number, not string)
-2. Required Fields: Check if objects are missing expected fields
-3. Value Validation: Check for impossible values (e.g., age: -5, port: 70000 exceeds valid range)
-4. Enum Validation: Check if fields have invalid values (e.g., environment: "unknown" when should be "dev"|"prod")
-5. List Consistency: Check if list items have consistent structure
-6. Reference Validation: Check if anchors and aliases are used correctly
-7. Cross-field Logic: Check relationships between fields (e.g., max_value < min_value)
-
-FOCUS ON DATA QUALITY AND SEMANTICS, NOT SYNTAX. The YAML structure is already validated.`
-  }
-  
-  return `You are a SEMANTIC DATA VALIDATOR. Analyze ONLY the data content below (not instructions or examples).
-
-⚠️ CRITICAL RULES:
-1. Read values EXACTLY as shown in the content section
-2. Do NOT report examples or test data from instructions
-3. ANY quantity with ANY unit is valid (do NOT report these)
-4. Different units across items is normal (do NOT report this)
-5. Numeric values like 0, 1, 2, 3, etc. are all valid
-
-✅ REPORT ONLY:
-- Type mismatches: Text where numbers clearly expected
-- Impossible values: Negative ages/prices, percentages > 100%
-- Logic errors: End before start, totals not matching sums
-
-❌ NEVER REPORT:
-- Valid quantity-unit pairs
-- Different units in lists
-- Normal numeric or string values
+  return `Analyze this ${fileType.toUpperCase()} data. Find ONLY obvious errors.
 
 File: ${fileName}
-Type: ${fileType}${rulesContext}
 
-Content:
+Data:
 \`\`\`
 ${contentPreview}
 \`\`\`
 
 ${specificInstructions}
 
-🎯 YOUR TASK:
-1. Analyze ONLY the content below (ignore instruction examples)
-2. Look for OBVIOUS problems: wrong types, impossible values  
-3. If data looks normal and valid, return []
-4. Maximum 10 real errors only
+RULES:
+- Shopping lists are ALWAYS VALID (items with quantities/units)
+- Positive numbers (1,2,3...) are ALWAYS VALID
+- Text strings ("lbs","gallon") are ALWAYS VALID
+- Only report: negative ages/prices, text in number fields, impossible percentages
+- If data looks normal: return []
 
-🚨 CRITICAL: IF NO REAL ERRORS EXIST, YOU MUST RETURN EMPTY ARRAY: []
-DO NOT INVENT OR REPORT UNNECESSARY ERRORS FROM VALID DATA.
-
-Output format (return JSON array):
-[
-  {
-    "line": <line_number>,
-    "column": null,
-    "message": "<brief error description>",
-    "type": "error",
-    "category": "data_quality",
-    "severity": "high",
-    "explanation": "<why this is an error>",
-    "suggestions": ["<how to fix>"]
-  }
-]
-OR if no errors: []
-
-RESPONSE FORMAT RULES:
-- Return JSON array with 0-10 error objects (semantic errors only)
-- Use ONLY double quotes (never single quotes)
-- NO trailing commas anywhere
-- NO text before [ or after ]
-- If NO semantic errors found, MUST return: []
-- severity: critical|high|medium|low
-- type: error|warning  
-- category: data_quality|logic|validation|inconsistency|missing_data`
+Return JSON array or [] if no errors:
+[{"line":1,"message":"error","type":"error","category":"data_quality","severity":"high","explanation":"why","suggestions":["fix"]}]`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
