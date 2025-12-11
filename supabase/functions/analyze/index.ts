@@ -251,45 +251,55 @@ You MUST return valid JSON array format ONLY. Even if file is perfect, return em
 }
 
 function buildPrompt(content: string, fileType: string, fileName: string, rulesContext: string = ''): string {
-  const contentPreview = content.length > 4000 ? content.substring(0, 4000) + '\n...[truncated]' : content
+  // For CSV files, send more content (up to 20KB) to detect column mismatches across many rows
+  // For other files, limit to 8KB to stay within token limits
+  const maxPreviewLength = fileType.toLowerCase() === 'csv' ? 20000 : 8000
+  const contentPreview = content.length > maxPreviewLength ? content.substring(0, maxPreviewLength) + '\n...[truncated]' : content
   
   let specificInstructions = ''
   
   if (fileType.toLowerCase() === 'csv') {
     specificInstructions = `
-SPECIFIC CHECKS FOR CSV:
-1. Check header row - ensure it has consistent field names
-2. Check data rows - EVERY row must have the SAME number of columns as the header
-3. Identify rows with missing columns (fewer values than header)
-4. Identify rows with extra columns (more values than header)
-5. Check for inconsistent data types in each column (e.g., numbers mixed with text where numbers are expected)
-6. Check for malformed quoted fields
-7. Check for duplicate rows or duplicate headers
-8. Check for empty rows in the middle of data
-9. Look for trailing commas or missing commas between fields
+CRITICAL CHECKS FOR CSV (MUST REPORT ALL):
+1. COUNT columns in header row - note this number
+2. COUNT columns in EVERY data row - check if they match header count
+3. REPORT each row that has DIFFERENT column count than header
+4. REPORT rows with missing columns (fewer than header)
+5. REPORT rows with extra columns (more than header)
+6. Check for inconsistent data types in each column (numbers mixed with text)
+7. Check for malformed quoted fields - quotes not properly escaped
+8. Check for duplicate rows or duplicate headers
+9. Check for empty rows in the middle of data
+10. Look for trailing commas or missing commas between fields
 
-REPORT EVERY STRUCTURAL ISSUE YOU FIND, not just syntax errors.`
+YOU MUST CHECK EVERY SINGLE ROW AND REPORT INCONSISTENCIES. This is critical. If header has 5 columns, check that every row also has 5 columns.`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
-SPECIFIC CHECKS FOR JSON:
-1. Validate JSON syntax - all brackets and braces must match
-2. Check all strings are properly quoted
-3. Check all object keys are properly quoted
-4. Check for trailing commas in objects/arrays
+CRITICAL CHECKS FOR JSON (MUST REPORT ALL):
+1. Validate JSON syntax - ALL brackets and braces must match
+2. Check ALL strings are properly quoted with double quotes
+3. Check ALL object keys are properly quoted with double quotes
+4. CHECK for trailing commas in objects/arrays - these are ERRORS
 5. Check for missing commas between key-value pairs
-6. Check for inconsistent data types in similar fields
-7. Look for duplicate keys in objects
-8. Validate all values are properly formatted`
+6. Check for inconsistent data types in similar fields (type mismatches)
+7. Look for duplicate keys in objects - flag as errors
+8. Validate all values are properly formatted and escaped
+9. Check for unescaped special characters like \\ and \"
+
+YOU MUST be exhaustive. If you see a comma after a closing bracket/brace, report it as error.`
   } else if (fileType.toLowerCase() === 'xml') {
     specificInstructions = `
-SPECIFIC CHECKS FOR XML:
-1. Check all tags are properly closed
-2. Check all attributes are properly quoted
-3. Check for duplicate elements
-4. Check for inconsistent nesting
-5. Check for invalid characters in text content
-6. Check for proper XML declaration if present
-7. Check for unmatched opening/closing tags`
+CRITICAL CHECKS FOR XML (MUST REPORT ALL):
+1. Check ALL tags are properly closed - no unclosed tags
+2. Check ALL attributes are properly quoted with quotes
+3. Check for duplicate elements at the same level
+4. Check for inconsistent nesting of elements
+5. Check for invalid characters in text content - must be escaped
+6. Check for proper XML declaration if present at start
+7. Check for unmatched opening/closing tags - must match exactly
+8. Check for proper character escaping (&lt; &gt; &amp; &quot;)
+
+YOU MUST check every element. If an opening tag <item> has no matching </item>, report it.`
   }
   
   return `You are a strict data validator. Analyze this ${fileType.toUpperCase()} file and identify ALL errors, warnings, and structural issues. Be thorough and report every problem you find.
