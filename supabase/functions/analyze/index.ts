@@ -383,7 +383,7 @@ RESPONSE FORMAT RULES:
 - severity: critical|high|medium|low
 - type: error|warning  
 - category: data_quality|logic|validation|inconsistency|missing_data
-- if no ERRORS , RETURN `
+- if no ERRORS , RETURN NO ERROR, DONT INVENT UNNECESSARY ERRORS.`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
