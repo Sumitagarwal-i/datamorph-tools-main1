@@ -204,23 +204,31 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: `You are a DATA QUALITY VALIDATOR. Analyze ONLY the content provided in the user message.
+            content: `You are a DATA QUALITY VALIDATOR. Your job: analyze the user's data file and find ONLY real data quality issues.
 
-YOUR JOB:
-- Find data type mismatches (text where numbers expected)
-- Find impossible values (negative where should be positive)
-- Find logical contradictions between fields
-- Find missing required data based on context
+🎯 WHAT TO REPORT:
+- Type mismatches: Text where numbers expected, or vice versa
+- Impossible values: Negative ages/prices, percentages over 100%, invalid dates
+- Logic errors: End dates before start dates, totals that don't match sums
+- Missing critical data: Required fields that are empty or null
 
-RULES:
-1. ONLY analyze the actual content shown in the user message
-2. Do NOT report errors from instruction examples
-3. Do NOT invent consistency requirements
-4. Valid data includes: any quantity (0,1,2,etc), any unit string (lbs, gallon, dozen, etc)
-5. If content is valid, return empty array []
+❌ DO NOT REPORT:
+- Valid numeric values (any positive number is valid unless context says otherwise)
+- Valid string values (any unit name, any text is valid)
+- Different units across items (items naturally have different units)
+- Any data that looks reasonable and normal
+
+⚠️ CRITICAL INSTRUCTIONS:
+1. ONLY analyze the content provided in the user message
+2. Do NOT report examples or test data from instructions
+3. Read values EXACTLY - do not misread or misinterpret
+4. If the user's data looks normal and valid, return empty array: []
+5. Do NOT invent errors or consistency rules
 6. When unsure, return [] instead of guessing
 
-Return ONLY valid JSON array format: [] or [{error objects}]`
+🚨 IF THERE ARE NO REAL ERRORS IN THE DATA, YOU MUST RETURN: []
+
+Return ONLY valid JSON array format.`
           },
           {
             role: 'user',
@@ -296,25 +304,16 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
   
   if (fileType.toLowerCase() === 'csv') {
     specificInstructions = `
-CSV DATA QUALITY CHECKS:
-- Numeric columns should contain only numbers (not text)
-- Check for impossible values (negatives where shouldn't be)
-- Check calculated fields match their components
-- Different rows can have different units/formats (this is normal)
-- Various quantity values are all valid (0, 1, 2, etc.)
-
-Report ONLY actual data quality problems you find in the content below.`
+CSV SEMANTIC VALIDATION:
+Look for: Text in numeric columns, negative values where impossible, calculation mismatches.
+Do NOT report: Different units, various quantities (all normal).
+If all data looks valid, return [].`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
-JSON DATA QUALITY CHECKS:
-- Check if numeric fields contain text instead of numbers
-- Check for impossible values (negatives where shouldn't be, percentages over 100)
-- Check logical relationships (end dates before start dates)
-- Check missing critical fields based on context
-- Note: Any quantity/unit combination is valid
-- Note: Different objects can have different field values/units
-
-Report ONLY actual data quality problems you find in the content below.`
+JSON SEMANTIC VALIDATION:
+Look for: Text where numbers expected, negative values where impossible, percentages over 100%.
+Do NOT report: Valid numbers, valid strings, different units across items (all normal).
+If all data looks valid, return [].`
   } else if (fileType.toLowerCase() === 'xml') {
     specificInstructions = `
 XML SEMANTIC VALIDATION (syntax already validated locally):
@@ -341,49 +340,68 @@ YAML SEMANTIC VALIDATION (syntax already validated locally):
 FOCUS ON DATA QUALITY AND SEMANTICS, NOT SYNTAX. The YAML structure is already validated.`
   }
   
-  return `Analyze the following ${fileType.toUpperCase()} content for data quality issues.
+  return `You are a SEMANTIC DATA VALIDATOR. Analyze ONLY the data content below (not instructions or examples).
 
-File: ${fileName}${rulesContext}
+⚠️ CRITICAL RULES:
+1. Read values EXACTLY as shown in the content section
+2. Do NOT report examples or test data from instructions
+3. ANY quantity with ANY unit is valid (do NOT report these)
+4. Different units across items is normal (do NOT report this)
+5. Numeric values like 0, 1, 2, 3, etc. are all valid
 
---- CONTENT TO ANALYZE ---
+✅ REPORT ONLY:
+- Type mismatches: Text where numbers clearly expected
+- Impossible values: Negative ages/prices, percentages > 100%
+- Logic errors: End before start, totals not matching sums
+
+❌ NEVER REPORT:
+- Valid quantity-unit pairs
+- Different units in lists
+- Normal numeric or string values
+
+File: ${fileName}
+Type: ${fileType}${rulesContext}
+
+Content:
+\`\`\`
 ${contentPreview}
---- END CONTENT ---
+\`\`\`
 
 ${specificInstructions}
 
-IMPORTANT INSTRUCTIONS:
-1. Analyze ONLY the content shown above between the markers
-2. Read all values exactly as written
-3. Look for: wrong data types, impossible values, logical errors
-4. Do NOT report: valid quantities, valid units, normal variations
-5. If content is valid, return empty array: []
-6. Maximum 10 most critical errors
-7. When in doubt, return []`
+🎯 YOUR TASK:
+1. Analyze ONLY the content below (ignore instruction examples)
+2. Look for OBVIOUS problems: wrong types, impossible values  
+3. If data looks normal and valid, return []
+4. Maximum 10 real errors only
 
-Example output format (ONLY return this JSON array structure):
+🚨 CRITICAL: IF NO REAL ERRORS EXIST, YOU MUST RETURN EMPTY ARRAY: []
+DO NOT INVENT OR REPORT UNNECESSARY ERRORS FROM VALID DATA.
+
+Output format (return JSON array):
 [
   {
-    "line": 5,
+    "line": <line_number>,
     "column": null,
-    "message": "Age value '-5' is invalid",
+    "message": "<brief error description>",
     "type": "error",
     "category": "data_quality",
     "severity": "high",
-    "explanation": "Age cannot be negative. Value should be positive integer.",
-    "suggestions": ["Change age to positive value", "Verify data source"]
+    "explanation": "<why this is an error>",
+    "suggestions": ["<how to fix>"]
   }
 ]
+OR if no errors: []
 
 RESPONSE FORMAT RULES:
 - Return JSON array with 0-10 error objects (semantic errors only)
 - Use ONLY double quotes (never single quotes)
 - NO trailing commas anywhere
 - NO text before [ or after ]
-- If NO semantic errors found, return: []
+- If NO semantic errors found, MUST return: []
 - severity: critical|high|medium|low
 - type: error|warning  
-- category: data_quality|logic|validation|inconsistency|missing_data
-- if no ERRORS , RETURN NO ERROR, DONT INVENT UNNECESSARY ERRORS.`
+- category: data_quality|logic|validation|inconsistency|missing_data`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
