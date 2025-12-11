@@ -222,7 +222,7 @@ You MUST return valid JSON array format ONLY. Even if file is perfect, return em
           }
         ],
         temperature: 0.1,
-        max_tokens: 3000,
+        max_tokens: 4000, // Increased to handle more errors without truncation
       }),
     })
 
@@ -345,7 +345,10 @@ ${contentPreview}
 
 ${specificInstructions}
 
-IMPORTANT - Return your analysis as a VALID JSON array with NO TRAILING COMMAS:
+IMPORTANT - Return your analysis as a VALID JSON array with NO TRAILING COMMAS.
+Limit your response to the TOP 20 most critical errors to avoid truncation.
+
+Example format:
 [
   {
     "line": 1,
@@ -360,16 +363,18 @@ IMPORTANT - Return your analysis as a VALID JSON array with NO TRAILING COMMAS:
 ]
 
 Rules for your response:
+- Return ONLY the TOP 20 most important/critical errors
 - Return ONLY valid JSON array (no extra text before or after)
 - NO trailing commas after last item
 - NO comments in JSON
-- Use double quotes for all strings
+- Use double quotes for all strings (never single quotes)
 - If NO errors found, return empty array: []
 - Each error object must have all required fields
 - Keep messages under 50 characters
 - severity must be: critical, high, medium, or low
 - type must be: error or warning
-- category must be: syntax, structure, format, validation, or inconsistency`
+- category must be: syntax, structure, format, validation, or inconsistency
+- Close all JSON properly - ensure every { has } and every [ has ]`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
@@ -404,44 +409,95 @@ function parseErrorsFromLLM(llmResponse: string): any[] {
         }))
       }
     } catch (parseError: any) {
-      // If direct parse fails, try to fix common issues
+      // If direct parse fails, try multiple recovery strategies
+      const errorPos = parseError?.message?.match(/position (\d+)/)?.[1]
+      
       logger.debug('[parser] Direct JSON parse failed, attempting recovery', {
         error: parseError?.message,
-        position: parseError?.message?.match(/position (\d+)/)?.[1],
+        position: errorPos,
+        json_length: jsonString.length,
+        json_preview_at_error: errorPos ? jsonString.substring(Math.max(0, parseInt(errorPos) - 50), Math.min(jsonString.length, parseInt(errorPos) + 50)) : 'N/A',
       })
 
-      // Try to fix common JSON issues
-      try {
-        // Remove trailing commas before closing brackets/braces
-        let fixedJson = jsonString.replace(/,(\s*[\]}])/g, '$1')
+      // Try multiple recovery strategies
+      const recoveryStrategies = [
+        // Strategy 1: Remove trailing commas
+        (json: string) => json.replace(/,(\s*[\]}])/g, '$1'),
         
-        // Try parsing the fixed version
-        const parsed = JSON.parse(fixedJson)
-        if (Array.isArray(parsed)) {
-          logger.info('[parser] Successfully recovered from malformed JSON', {
-            original_length: jsonString.length,
-            fixed_length: fixedJson.length,
-          })
-          return parsed.map((err, idx) => ({
-            id: `error-${idx}`,
-            line: err.line || 1,
-            column: err.column || null,
-            message: err.message || 'Unknown error',
-            type: err.type || 'error',
-            category: err.category || 'general',
-            severity: err.severity || 'medium',
-            explanation: err.explanation || '',
-            confidence: 0.85,
-            suggestions: Array.isArray(err.suggestions) ? err.suggestions : [],
-          }))
+        // Strategy 2: Fix truncated response - remove incomplete last object
+        (json: string) => {
+          // Check if response is truncated (doesn't end with ])
+          if (!json.trim().endsWith(']')) {
+            logger.info('[parser] Detected truncated response, removing incomplete last object')
+            // Find the last complete object by finding the last '},'
+            const lastCompleteObject = json.lastIndexOf('},')
+            if (lastCompleteObject > 0) {
+              // Remove everything after the last complete object and close the array
+              return json.substring(0, lastCompleteObject + 1) + '\n]'
+            } else {
+              // No complete objects found, try to find at least one closing brace
+              const lastBrace = json.lastIndexOf('}')
+              if (lastBrace > 0) {
+                return json.substring(0, lastBrace + 1) + '\n]'
+              }
+            }
+          }
+          return json
+        },
+        
+        // Strategy 3: Fix single quotes to double quotes
+        (json: string) => json.replace(/'/g, '"'),
+        
+        // Strategy 4: Fix missing quotes around property names
+        (json: string) => json.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3'),
+        
+        // Strategy 5: Remove any text before/after the JSON array
+        (json: string) => {
+          const match = json.match(/\[[\s\S]*\]/)
+          return match ? match[0] : json
+        },
+      ]
+
+      for (let i = 0; i < recoveryStrategies.length; i++) {
+        try {
+          let fixedJson = jsonString
+          for (let j = 0; j <= i; j++) {
+            fixedJson = recoveryStrategies[j](fixedJson)
+          }
+          
+          const parsed = JSON.parse(fixedJson)
+          if (Array.isArray(parsed)) {
+            logger.info('[parser] Successfully recovered from malformed JSON', {
+              strategy_used: `combination_of_${i + 1}_strategies`,
+              original_length: jsonString.length,
+              fixed_length: fixedJson.length,
+            })
+            return parsed.map((err, idx) => ({
+              id: `error-${idx}`,
+              line: err.line || 1,
+              column: err.column || null,
+              message: err.message || 'Unknown error',
+              type: err.type || 'error',
+              category: err.category || 'general',
+              severity: err.severity || 'medium',
+              explanation: err.explanation || '',
+              confidence: 0.85,
+              suggestions: Array.isArray(err.suggestions) ? err.suggestions : [],
+            }))
+          }
+        } catch (strategyError) {
+          // Try next strategy
+          continue
         }
-      } catch (recoveryError) {
-        logger.error('[parser] Recovery from malformed JSON failed', {
-          original_error: parseError?.message,
-          recovery_error: (recoveryError as any)?.message,
-          response_preview: jsonString.substring(0, 300),
-        })
       }
+      
+      // All strategies failed, log detailed error
+      logger.error('[parser] All recovery strategies failed', {
+        original_error: parseError?.message,
+        json_length: jsonString.length,
+        json_start: jsonString.substring(0, 200),
+        json_end: jsonString.substring(Math.max(0, jsonString.length - 200)),
+      })
     }
     
     logger.error('[parser] Could not parse LLM response as valid JSON array')
