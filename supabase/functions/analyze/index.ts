@@ -204,15 +204,26 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: `You are an expert data file validator. Your job is to ACCURATELY identify real errors and issues in files.
+            content: `You are a DATA QUALITY and SEMANTIC VALIDATOR. Your role is to find LOGICAL and SEMANTIC errors, NOT SYNTAX errors.
 
-IMPORTANT RULES:
-- Only report ACTUAL errors that exist in the content
+YOUR RESPONSIBILITIES:
+- Validate data types (e.g., age should be number, not "twenty")
+- Check for impossible values (e.g., age: -5, dates in future for historical data)
+- Validate cross-field logic (e.g., end_date before start_date)
+- Check for missing required fields based on context
+- Identify data inconsistencies and quality issues
+- Validate business rules and constraints
+
+NOT YOUR RESPONSIBILITY:
+- DO NOT check syntax (brackets, commas, quotes) - that's handled separately
+- DO NOT validate file structure or formatting
+- DO NOT check for parsing errors
+
+IMPORTANT:
+- Only report REAL semantic/logical errors you can verify
 - Do NOT invent or hallucinate errors
-- Verify each error before reporting it
-- If file is valid, return empty array []
-- Be precise and factual, not overly aggressive
-- Double-check your findings before including them
+- If data quality is good, return empty array []
+- Be precise and factual
 
 Return ONLY valid JSON array format.`
           },
@@ -290,44 +301,56 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
   
   if (fileType.toLowerCase() === 'csv') {
     specificInstructions = `
-CSV VALIDATION - Report ONLY actual errors:
-1. Count columns in header row
-2. For each sample row, count columns and compare to header
-3. Report rows that have different column count than header
-4. Check for obviously malformed quoted fields (unclosed quotes)
-5. Check for data type mismatches (text where numbers expected)
+CSV SEMANTIC VALIDATION (syntax already validated locally):
+1. Data Type Validation: Check if numeric columns contain text (e.g., age: "twenty" should be number)
+2. Value Range: Check for impossible values (e.g., negative prices, ages over 150)
+3. Consistency: Check if same field has inconsistent formats (e.g., dates: "2023-01-01" vs "01/01/2023")
+4. Required Fields: Check if critical fields are empty (e.g., missing email in user data)
+5. Cross-field Logic: Check relationships between fields (e.g., total_price should match quantity × unit_price)
 
-IMPORTANT: Verify each error by counting. Do NOT report false positives.`
+FOCUS ON DATA QUALITY, NOT SYNTAX. The file structure is already validated.`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
-JSON VALIDATION - Report ONLY actual errors:
-1. Parse the JSON mentally - if it parses correctly, don't report syntax errors
-2. Check for ACTUAL trailing commas (comma before } or ])
-3. Check for ACTUAL missing commas (two items with no comma between)
-4. Verify all keys are quoted with double quotes
-5. Verify all strings use double quotes (not single)
-6. Check for duplicate keys in same object
-7. Verify brackets/braces are balanced
+JSON SEMANTIC VALIDATION (syntax already validated locally):
+1. Data Type Validation: Check if fields have correct types (e.g., "age": "25" should be number, not string)
+2. Required Fields: Check if objects are missing expected fields (e.g., user without "email")
+3. Value Validation: Check for impossible values (e.g., "age": -5, "quantity": 0 when shouldn't be zero)
+4. Enum Validation: Check if status/category fields have invalid values (e.g., status: "unknown" when should be "active"|"inactive")
+5. ID References: Check if referenced IDs exist (e.g., "user_id": 999 when users only go to 100)
+6. Cross-field Logic: Check field relationships (e.g., "discount_percent" is 150 which exceeds 100%)
+7. Date Logic: Check date relationships (e.g., "end_date" is before "start_date")
 
-IMPORTANT: Verify each error exists before reporting. Do NOT report false positives.`
+FOCUS ON DATA QUALITY AND LOGIC, NOT SYNTAX. The JSON structure is already validated.`
   } else if (fileType.toLowerCase() === 'xml') {
     specificInstructions = `
-CRITICAL CHECKS FOR XML (MUST REPORT ALL):
-1. Check ALL tags are properly closed - no unclosed tags
-2. Check ALL attributes are properly quoted with quotes
-3. Check for duplicate elements at the same level
-4. Check for inconsistent nesting of elements
-5. Check for invalid characters in text content - must be escaped
-6. Check for proper XML declaration if present at start
-7. Check for unmatched opening/closing tags - must match exactly
-8. Check for proper character escaping (&lt; &gt; &amp; &quot;)
+XML SEMANTIC VALIDATION (syntax already validated locally):
+1. Data Type Validation: Check if numeric fields contain text (e.g., <age>twenty</age> should be number)
+2. Required Elements: Check if mandatory child elements are missing
+3. Value Validation: Check for impossible values (e.g., <price>-10</price>)
+4. Attribute Values: Check if attributes have valid values (e.g., status="unknown" when should be defined)
+5. ID References: Check if IDREF attributes reference existing IDs
+6. Cross-element Logic: Check relationships between elements (e.g., quantity and total match)
+7. Namespace Usage: Check if namespaces are used consistently
 
-YOU MUST check every element. If an opening tag <item> has no matching </item>, report it.`
+FOCUS ON DATA QUALITY AND SEMANTICS, NOT SYNTAX. The XML structure is already validated.`
+  } else if (fileType.toLowerCase() === 'yaml') {
+    specificInstructions = `
+YAML SEMANTIC VALIDATION (syntax already validated locally):
+1. Data Type Validation: Check if values have correct types (e.g., age: "25" should be number, not string)
+2. Required Fields: Check if objects are missing expected fields
+3. Value Validation: Check for impossible values (e.g., age: -5, port: 70000 exceeds valid range)
+4. Enum Validation: Check if fields have invalid values (e.g., environment: "unknown" when should be "dev"|"prod")
+5. List Consistency: Check if list items have consistent structure
+6. Reference Validation: Check if anchors and aliases are used correctly
+7. Cross-field Logic: Check relationships between fields (e.g., max_value < min_value)
+
+FOCUS ON DATA QUALITY AND SEMANTICS, NOT SYNTAX. The YAML structure is already validated.`
   }
   
-  return `You are an expert data validator. Analyze this ${fileType.toUpperCase()} file and identify ONLY REAL errors that actually exist.
+  return `You are a SEMANTIC DATA VALIDATOR. The file syntax has already been validated locally - your job is to find DATA QUALITY and LOGIC errors only.
 
-CRITICAL: Be ACCURATE, not aggressive. Only report errors you can verify in the content shown.
+🎯 YOUR FOCUS: Find semantic issues like wrong data types, impossible values, missing required data, logical inconsistencies.
+❌ NOT YOUR JOB: DO NOT check syntax, brackets, commas, quotes, or formatting - that's already done.
 
 File: ${fileName}
 Type: ${fileType}${rulesContext}
@@ -339,38 +362,39 @@ ${contentPreview}
 
 ${specificInstructions}
 
-VALIDATION RULES - FOLLOW EXACTLY:
-- First, CHECK if the content is actually valid before reporting errors
-- ONLY report errors that truly exist in the content
-- Do NOT report errors you cannot directly see in the content
-- If content is valid (all syntax correct, proper structure), return empty array []
-- Maximum 10 most critical REAL errors only
-- Verify each error exists before including it
+VALIDATION APPROACH:
+1. Assume the file structure is syntactically correct
+2. Look for DATA QUALITY issues: wrong types, impossible values, missing data
+3. Check LOGICAL RELATIONSHIPS between fields
+4. Validate BUSINESS RULES and constraints
+5. If data quality is good, return empty array []
+6. Maximum 10 most critical semantic errors only
 
-Example format (return ONLY this structure):
+Remember: You're checking DATA QUALITY, not syntax. Be intelligent and accurate.
+
+Example output format (ONLY return this JSON array structure):
 [
   {
-    "line": 1,
+    "line": 5,
     "column": null,
-    "message": "Short error desc",
+    "message": "Age value '-5' is invalid",
     "type": "error",
-    "category": "syntax",
-    "severity": "critical",
-    "explanation": "Brief explanation",
-    "suggestions": ["fix"]
+    "category": "data_quality",
+    "severity": "high",
+    "explanation": "Age cannot be negative. Value should be positive integer.",
+    "suggestions": ["Change age to positive value", "Verify data source"]
   }
 ]
 
-ABSOLUTE RULES:
-- Maximum 10 error objects
-- Use ONLY double quotes
-- NO trailing commas
+RESPONSE FORMAT RULES:
+- Return JSON array with 0-10 error objects (semantic errors only)
+- Use ONLY double quotes (never single quotes)
+- NO trailing commas anywhere
 - NO text before [ or after ]
-- Close every { with } and every [ with ]
-- If NO errors found, return: []
+- If NO semantic errors found, return: []
 - severity: critical|high|medium|low
 - type: error|warning  
-- category: syntax|structure|format|validation|inconsistency`
+- category: data_quality|logic|validation|inconsistency|missing_data`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
