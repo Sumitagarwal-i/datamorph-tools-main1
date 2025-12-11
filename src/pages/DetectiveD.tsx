@@ -398,6 +398,12 @@ const DetectiveD = () => {
 
       const result = await response.json();
       
+      console.log('AI analysis response:', {
+        status: response.status,
+        errorsCount: result.errors?.length || 0,
+        result: result,
+      });
+      
       // Transform API response to ErrorItem format
       const rawErrors: ErrorItem[] = (result.errors || []).map((err: any, idx: number) => ({
         id: `ai-${Date.now()}-${idx}`,
@@ -416,8 +422,12 @@ const DetectiveD = () => {
         severity: err.severity || 'medium',
       }));
 
+      // COMBINE local validation errors with AI errors (don't replace!)
+      const localErrors = validateSyntax(editorContent, activeFile.name);
+      const allErrors = [...localErrors, ...rawErrors];
+
       // Group similar errors occurring on different lines
-      const groupedErrors = groupSimilarErrors(rawErrors);
+      const groupedErrors = groupSimilarErrors(allErrors);
 
       setErrors(groupedErrors);
       setLastValidationTime(Date.now());

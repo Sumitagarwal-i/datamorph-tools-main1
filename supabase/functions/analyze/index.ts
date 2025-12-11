@@ -207,7 +207,46 @@ async function callGroqAPI(
 function buildPrompt(content: string, fileType: string, fileName: string): string {
   const contentPreview = content.length > 4000 ? content.substring(0, 4000) + '\n...[truncated]' : content
   
-  return `Analyze this ${fileType.toUpperCase()} file and identify ALL errors, warnings, and issues.
+  let specificInstructions = ''
+  
+  if (fileType.toLowerCase() === 'csv') {
+    specificInstructions = `
+SPECIFIC CHECKS FOR CSV:
+1. Check header row - ensure it has consistent field names
+2. Check data rows - EVERY row must have the SAME number of columns as the header
+3. Identify rows with missing columns (fewer values than header)
+4. Identify rows with extra columns (more values than header)
+5. Check for inconsistent data types in each column (e.g., numbers mixed with text where numbers are expected)
+6. Check for malformed quoted fields
+7. Check for duplicate rows or duplicate headers
+8. Check for empty rows in the middle of data
+9. Look for trailing commas or missing commas between fields
+
+REPORT EVERY STRUCTURAL ISSUE YOU FIND, not just syntax errors.`
+  } else if (fileType.toLowerCase() === 'json') {
+    specificInstructions = `
+SPECIFIC CHECKS FOR JSON:
+1. Validate JSON syntax - all brackets and braces must match
+2. Check all strings are properly quoted
+3. Check all object keys are properly quoted
+4. Check for trailing commas in objects/arrays
+5. Check for missing commas between key-value pairs
+6. Check for inconsistent data types in similar fields
+7. Look for duplicate keys in objects
+8. Validate all values are properly formatted`
+  } else if (fileType.toLowerCase() === 'xml') {
+    specificInstructions = `
+SPECIFIC CHECKS FOR XML:
+1. Check all tags are properly closed
+2. Check all attributes are properly quoted
+3. Check for duplicate elements
+4. Check for inconsistent nesting
+5. Check for invalid characters in text content
+6. Check for proper XML declaration if present
+7. Check for unmatched opening/closing tags`
+  }
+  
+  return `You are a strict data validator. Analyze this ${fileType.toUpperCase()} file and identify ALL errors, warnings, and structural issues. Be thorough and report every problem you find.
 
 File: ${fileName}
 Type: ${fileType}
@@ -217,31 +256,35 @@ Content:
 ${contentPreview}
 \`\`\`
 
-Return your analysis as a JSON array of error objects. Each error must have:
-- line: line number (number)
+${specificInstructions}
+
+Return your analysis as a JSON array of error objects. IMPORTANT: If you find NO issues, return an empty array: []
+
+Each error must have:
+- line: line number where the error occurs (number, 1-indexed)
 - column: column number if known (number or null)
-- message: brief error description (string)
+- message: brief error description (string, max 50 chars)
 - type: "error" or "warning" (string)
-- category: error category like "syntax", "structure", "format" (string)
+- category: one of "syntax", "structure", "format", "validation", "inconsistency" (string)
 - severity: "critical", "high", "medium", or "low" (string)
-- explanation: detailed explanation (string)
+- explanation: detailed explanation of the issue (string)
 - suggestions: array of suggested fixes (string[])
 
 Example format:
 [
   {
-    "line": 5,
-    "column": 12,
-    "message": "Missing comma",
+    "line": 3,
+    "column": null,
+    "message": "Row has 4 columns, expected 5",
     "type": "error",
-    "category": "syntax",
+    "category": "structure",
     "severity": "high",
-    "explanation": "A comma is required after this value",
-    "suggestions": ["Add a comma after the value", "Check JSON syntax"]
+    "explanation": "This row has fewer columns than the header. The header has 5 fields but this row only has 4 values.",
+    "suggestions": ["Add missing column value", "Fix the row to match header structure"]
   }
 ]
 
-Return ONLY the JSON array, no other text.`
+Return ONLY valid JSON array, no other text.`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
