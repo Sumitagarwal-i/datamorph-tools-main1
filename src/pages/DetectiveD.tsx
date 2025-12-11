@@ -373,29 +373,18 @@ const DetectiveD = () => {
         fileSize: `${(requestSize / 1024).toFixed(2)}KB`,
         contentLength: editorContent.length,
         fileType,
-        endpoint: 'api/analyze-streaming (primary), fallback to /api/analyze',
+        endpoint: 'Supabase Edge Function: analyze',
       });
 
-      // Try streaming endpoint first (best body parsing)
-      let response = await fetch('/api/analyze-streaming', {
+      // Call Supabase Edge Function (no more 413 errors!)
+      const response = await fetch('https://emvtxsjzxcpluflrdyut.supabase.co/functions/v1/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtdnR4c2p6eGNwbHVmbHJkeXV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MjQ5MjUsImV4cCI6MjA3OTIwMDkyNX0.KWfgtAvdCtk2aETI6KzVjK5G_Anxn3cGeHvJFoGTxRo`,
         },
         body: requestBody,
       });
-
-      // If streaming fails, try main endpoint
-      if (!response.ok) {
-        console.log('analyze-streaming failed with status', response.status, 'trying main /api/analyze endpoint');
-        response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: requestBody,
-        });
-      }
 
       if (!response.ok) {
         const errorText = await response.text();
