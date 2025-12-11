@@ -150,9 +150,39 @@ async function callGroqAPI(
       return { errors: [] }
     }
 
-    // DISABLED: Supabase rules loading - causes LLM confusion with examples
-    // Using ultra-minimal prompts instead for accuracy
-    const rulesContext = ''
+    // Fetch validation rules from Supabase (exclude examples to avoid confusion)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+    
+    let rulesContext = ''
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey)
+        const { data: rules, error: rulesError } = await supabase
+          .from('vw_active_rules')
+          .select('rule_name,rule_description,severity')
+          .eq('file_type', fileType.toLowerCase())
+          .order('severity', { ascending: false })
+
+        if (!rulesError && rules && rules.length > 0) {
+          rulesContext = '\n\nVALIDATION RULES:\n'
+          rulesContext += rules
+            .slice(0, 10)
+            .map((rule: any) => 
+              `- ${rule.rule_name}: ${rule.rule_description}`
+            )
+            .join('\n')
+
+          logger.info('[rules] Loaded validation rules', {
+            request_id: requestId,
+            file_type: fileType,
+            rule_count: rules.length,
+          })
+        }
+      } catch (err: any) {
+        logger.debug('[rules] Failed to load rules from Supabase', err?.message)
+      }
+    }
 
     const prompt = buildPrompt(content, fileType, fileName, rulesContext)
     
@@ -173,31 +203,36 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: `You are a data validator. Find ONLY OBVIOUS problems:
+            content: `You are a data quality validator. Analyze files and report ONLY real data quality issues.
 
-✅ REPORT ONLY:
-- Text in numeric fields (age: "twenty")
-- Negative values (age: -5, price: -100)
-- Impossible percentages (discount: 150%)
-- Date logic errors (end before start)
+WHAT TO REPORT:
+- Wrong data types (text in numeric fields, numbers as strings when should be numbers)
+- Impossible values (negative ages/prices, percentages over 100%, invalid dates)
+- Logic errors (end_date before start_date, totals not matching calculations)
+- Missing required fields (based on context)
+- Data inconsistencies (format changes mid-file, conflicting values)
 
-❌ NEVER REPORT:
-- Shopping lists with items/quantities/units (ALL VALID)
-- Any positive numbers (1, 2, 3, etc. are ALL VALID)
-- Any text strings ("lbs", "gallon" are ALL VALID)  
-- Data that looks normal
+WHAT NOT TO REPORT:
+- Normal data variations (different units, various quantities, mixed formats are often valid)
+- Valid data structures (arrays of objects with consistent properties)
+- Context-appropriate values (judge based on field names and data type)
 
-🚨 IF DATA LOOKS NORMAL, RETURN: []
+RULES:
+1. Analyze the actual data content provided
+2. Consider the context and data type
+3. If data appears valid for its purpose, return []
+4. When uncertain, return [] rather than false positives
+5. Report maximum 10 most critical issues
 
-Return JSON array only.`
+Return JSON array format only.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0, // Maximum determinism
-        max_tokens: 1000, // Minimal - force brevity
+        temperature: 0.2, // Low but not zero for some reasoning ability
+        max_tokens: 1500, // Enough for complex files
       }),
     })
 
@@ -261,28 +296,38 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
     contentPreview = content.length > maxPreviewLength ? content.substring(0, maxPreviewLength) + '\n...[truncated]' : content
   }
   
-  const specificInstructions = 'If this is a shopping list, inventory, or similar normal data structure, return [].'
+  let specificInstructions = ''
   
-  return `Analyze this ${fileType.toUpperCase()} data. Find ONLY obvious errors.
+  if (fileType.toLowerCase() === 'json') {
+    specificInstructions = `\nFOCUS: Type validation, impossible values, logic errors, missing required fields.`
+  } else if (fileType.toLowerCase() === 'csv') {
+    specificInstructions = `\nFOCUS: Column consistency, data types, impossible values, calculation errors.`
+  } else if (fileType.toLowerCase() === 'xml') {
+    specificInstructions = `\nFOCUS: Data types in elements, impossible values, missing required elements.`
+  } else if (fileType.toLowerCase() === 'yaml') {
+    specificInstructions = `\nFOCUS: Type validation, impossible values, missing required fields, logic errors.`
+  }
+  
+  return `Analyze this ${fileType.toUpperCase()} file for data quality issues.${rulesContext}
 
 File: ${fileName}
 
 Data:
 \`\`\`
 ${contentPreview}
-\`\`\`
+\`\`\`${specificInstructions}
 
-${specificInstructions}
+INSTRUCTIONS:
+- Report only REAL errors (wrong types, impossible values, logic errors)
+- Consider context: field names and data structure indicate intended use
+- Normal variations are acceptable (different units, quantities, formats)
+- If data is valid for its purpose, return []
+- Maximum 10 most critical issues
 
-RULES:
-- Shopping lists are ALWAYS VALID (items with quantities/units)
-- Positive numbers (1,2,3...) are ALWAYS VALID
-- Text strings ("lbs","gallon") are ALWAYS VALID
-- Only report: negative ages/prices, text in number fields, impossible percentages
-- If data looks normal: return []
+Return JSON array:
+[{"line":1,"message":"brief error","type":"error","category":"data_quality","severity":"high","explanation":"why this is wrong","suggestions":["how to fix"]}]
 
-Return JSON array or [] if no errors:
-[{"line":1,"message":"error","type":"error","category":"data_quality","severity":"high","explanation":"why","suggestions":["fix"]}]`
+If no errors, return: []`
 }
 
 function parseErrorsFromLLM(llmResponse: string): any[] {
