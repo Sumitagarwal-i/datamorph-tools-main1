@@ -401,8 +401,14 @@ const DetectiveD = () => {
       console.log('AI analysis response:', {
         status: response.status,
         errorsCount: result.errors?.length || 0,
-        result: result,
+        rawResponse: result,
       });
+      
+      console.log('===== DEBUGGING DEEP DIVE =====');
+      console.log('1. Raw API response errors:', result.errors);
+      console.log('2. Response type:', typeof result);
+      console.log('3. Response keys:', Object.keys(result));
+      console.log('4. Errors array:', Array.isArray(result.errors), 'Length:', result.errors?.length);
       
       // Transform API response to ErrorItem format
       const rawErrors: ErrorItem[] = (result.errors || []).map((err: any, idx: number) => ({
@@ -426,8 +432,16 @@ const DetectiveD = () => {
       const localErrors = validateSyntax(editorContent, activeFile.name);
       const allErrors = [...localErrors, ...rawErrors];
 
+      console.log('3. Local validation errors:', localErrors.length);
+      console.log('4. Raw AI errors:', rawErrors.length);
+      console.log('5. Combined errors before grouping:', allErrors.length);
+
       // Group similar errors occurring on different lines
       const groupedErrors = groupSimilarErrors(allErrors);
+
+      console.log('6. Grouped errors:', groupedErrors.length);
+      console.log('7. Grouped errors details:', groupedErrors);
+      console.log('===== END DEBUG =====');
 
       setErrors(groupedErrors);
       setLastValidationTime(Date.now());
