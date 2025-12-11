@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -149,7 +150,42 @@ async function callGroqAPI(
       return { errors: [] }
     }
 
-    const prompt = buildPrompt(content, fileType, fileName)
+    // Fetch validation rules from Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+    
+    let rulesContext = ''
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey)
+        const { data: rules, error: rulesError } = await supabase
+          .from('vw_active_rules')
+          .select('rule_name,rule_description,rule_example,common_mistake,fix_suggestion,severity')
+          .eq('file_type', fileType.toLowerCase())
+          .order('severity', { ascending: false })
+
+        if (!rulesError && rules && rules.length > 0) {
+          rulesContext = '\n\nVALIDATION RULES FOR THIS FILE TYPE:\n'
+          rulesContext += rules
+            .slice(0, 15) // Limit to top 15 rules to avoid prompt bloat
+            .map((rule: any) => 
+              `- [${rule.severity.toUpperCase()}] ${rule.rule_name}: ${rule.rule_description}`
+            )
+            .join('\n')
+
+          logger.info('[rules] Loaded validation rules', {
+            request_id: requestId,
+            file_type: fileType,
+            rule_count: rules.length,
+          })
+        }
+      } catch (err: any) {
+        logger.debug('[rules] Failed to load rules from Supabase', err?.message)
+        // Continue without rules if fetch fails
+      }
+    }
+
+    const prompt = buildPrompt(content, fileType, fileName, rulesContext)
     
     logger.info('[groq] Calling API', {
       request_id: requestId,
@@ -168,7 +204,7 @@ async function callGroqAPI(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert data file validator. Analyze files and return errors in JSON format.'
+            content: 'You are an expert data file validator. Analyze files and return errors in JSON format. Be thorough and report ALL issues found.'
           },
           {
             role: 'user',
@@ -204,7 +240,7 @@ async function callGroqAPI(
   }
 }
 
-function buildPrompt(content: string, fileType: string, fileName: string): string {
+function buildPrompt(content: string, fileType: string, fileName: string, rulesContext: string = ''): string {
   const contentPreview = content.length > 4000 ? content.substring(0, 4000) + '\n...[truncated]' : content
   
   let specificInstructions = ''
@@ -249,7 +285,7 @@ SPECIFIC CHECKS FOR XML:
   return `You are a strict data validator. Analyze this ${fileType.toUpperCase()} file and identify ALL errors, warnings, and structural issues. Be thorough and report every problem you find.
 
 File: ${fileName}
-Type: ${fileType}
+Type: ${fileType}${rulesContext}
 
 Content:
 \`\`\`
@@ -270,8 +306,7 @@ Each error must have:
 - explanation: detailed explanation of the issue (string)
 - suggestions: array of suggested fixes (string[])
 
-Example format:
-[
+Return ONLY the JSON array, no other text.`
   {
     "line": 3,
     "column": null,
