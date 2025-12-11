@@ -251,10 +251,40 @@ You MUST return valid JSON array format ONLY. Even if file is perfect, return em
 }
 
 function buildPrompt(content: string, fileType: string, fileName: string, rulesContext: string = ''): string {
-  // For CSV files, send more content (up to 20KB) to detect column mismatches across many rows
-  // For other files, limit to 8KB to stay within token limits
-  const maxPreviewLength = fileType.toLowerCase() === 'csv' ? 20000 : 8000
-  const contentPreview = content.length > maxPreviewLength ? content.substring(0, maxPreviewLength) + '\n...[truncated]' : content
+  let contentPreview: string
+  
+  // For CSV files with large content, use strategic sampling to show patterns
+  if (fileType.toLowerCase() === 'csv' && content.length > 20000) {
+    const lines = content.split('\n')
+    const headerLine = lines[0] || ''
+    const sampleSize = 15 // Show 15 lines from different parts
+    
+    // Create a strategic sample: header + samples from throughout the file
+    let sampledLines = [headerLine]
+    
+    if (lines.length > sampleSize) {
+      // Calculate step to get evenly distributed samples
+      const step = Math.floor((lines.length - 1) / (sampleSize - 1))
+      for (let i = 1; i < sampleSize && i < lines.length; i++) {
+        const idx = Math.min(i * step, lines.length - 1)
+        sampledLines.push(lines[idx])
+      }
+    } else {
+      sampledLines = lines.slice(0, sampleSize)
+    }
+    
+    contentPreview = `[HEADER + STRATEGIC SAMPLES FROM FILE - showing ${sampledLines.length} lines representing the full file structure]\n\n${sampledLines.join('\n')}\n\n[...more rows not shown...]`
+    
+    logger.info('[sampling] Using strategic CSV sampling', {
+      original_size: content.length,
+      total_lines: lines.length,
+      sample_lines: sampledLines.length,
+    })
+  } else {
+    // For smaller files or non-CSV, use simple truncation
+    const maxPreviewLength = fileType.toLowerCase() === 'csv' ? 20000 : 8000
+    contentPreview = content.length > maxPreviewLength ? content.substring(0, maxPreviewLength) + '\n...[truncated]' : content
+  }
   
   let specificInstructions = ''
   
@@ -262,7 +292,7 @@ function buildPrompt(content: string, fileType: string, fileName: string, rulesC
     specificInstructions = `
 CRITICAL CHECKS FOR CSV (MUST REPORT ALL):
 1. COUNT columns in header row - note this number
-2. COUNT columns in EVERY data row - check if they match header count
+2. COUNT columns in EVERY sample row shown - check if they match header count
 3. REPORT each row that has DIFFERENT column count than header
 4. REPORT rows with missing columns (fewer than header)
 5. REPORT rows with extra columns (more than header)
@@ -272,7 +302,8 @@ CRITICAL CHECKS FOR CSV (MUST REPORT ALL):
 9. Check for empty rows in the middle of data
 10. Look for trailing commas or missing commas between fields
 
-YOU MUST CHECK EVERY SINGLE ROW AND REPORT INCONSISTENCIES. This is critical. If header has 5 columns, check that every row also has 5 columns.`
+IMPORTANT: The samples shown represent a full file. If you see inconsistencies in samples, assume they repeat throughout.
+YOU MUST CHECK EVERY SAMPLE ROW AND REPORT INCONSISTENCIES. This is critical. If header has 5 columns, check that every row also has 5 columns.`
   } else if (fileType.toLowerCase() === 'json') {
     specificInstructions = `
 CRITICAL CHECKS FOR JSON (MUST REPORT ALL):
