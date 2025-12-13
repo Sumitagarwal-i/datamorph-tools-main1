@@ -527,7 +527,7 @@ Return a JSON array of 0–10 items, each like:
 
 If no semantic errors are confidently found, return [].
 
-Return ONLY a JSON array. No text before or after.
+IMPORTANT : Return ONLY a JSON array. No text before or after.
   `;
 }
 
@@ -574,10 +574,32 @@ function parseErrorsFromLLM(llmResponse: string): any[] {
       return []
     }
     
-    // Try to extract JSON array from the response - use non-greedy match
-    const jsonMatch = cleanedResponse.match(/\[[\s\S]*?\]/);
+    // Try to extract JSON array from the response
+    // First try non-greedy match
+    let jsonMatch = cleanedResponse.match(/\[[\s\S]*?\]/);
+    
+    // If that fails, try greedy match (might catch more)
     if (!jsonMatch) {
-      logger.error('[parser] No JSON array found in response - FULL RESPONSE:', {
+      jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
+    }
+    
+    // If still no match, try to find if there are individual objects we can salvage
+    if (!jsonMatch) {
+      logger.info('[parser] No JSON array found, attempting to find individual error objects')
+      
+      // Try to find any JSON objects in the response
+      const objectMatches = cleanedResponse.match(/\{[^{}]*"(line|message|category)"[^{}]*\}/g)
+      if (objectMatches && objectMatches.length > 0) {
+        logger.info('[parser] Found individual error objects, attempting to build array', {
+          object_count: objectMatches.length
+        })
+        // Try to build an array from found objects
+        jsonMatch = ['[' + objectMatches.join(',') + ']']
+      }
+    }
+    
+    if (!jsonMatch) {
+      logger.error('[parser] No JSON array or objects found - FULL RESPONSE:', {
         response_length: llmResponse.length,
         full_raw_response: llmResponse, // Log ENTIRE response for debugging
       })
