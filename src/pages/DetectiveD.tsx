@@ -345,6 +345,83 @@ const DetectiveD = () => {
     return Array.from(errorGroups.values()).sort((a, b) => a.line - b.line);
   };
 
+  // Correct line numbers by searching actual file content
+  const correctLineNumbers = (errors: ErrorItem[], fileContent: string): ErrorItem[] => {
+    const lines = fileContent.split('\n');
+    
+    return errors.map(error => {
+      // If line number is already accurate (from local validation), keep it
+      if (error.source === 'local') {
+        return error;
+      }
+      
+      // For AI errors, try to find the actual line
+      const llmLine = error.line || 1;
+      
+      // Extract key terms from error message to search for
+      const searchTerms = extractSearchTerms(error.message);
+      
+      if (searchTerms.length === 0) {
+        // No searchable terms, keep LLM's guess
+        return error;
+      }
+      
+      // Search for the error near the LLM's guessed line first (within ±10 lines)
+      const searchStart = Math.max(0, llmLine - 11);
+      const searchEnd = Math.min(lines.length, llmLine + 10);
+      
+      for (let i = searchStart; i < searchEnd; i++) {
+        const lineContent = lines[i].toLowerCase();
+        if (searchTerms.some(term => lineContent.includes(term))) {
+          return { ...error, line: i + 1 };
+        }
+      }
+      
+      // If not found nearby, search entire file
+      for (let i = 0; i < lines.length; i++) {
+        const lineContent = lines[i].toLowerCase();
+        if (searchTerms.some(term => lineContent.includes(term))) {
+          return { ...error, line: i + 1 };
+        }
+      }
+      
+      // Could not find, keep LLM's guess but mark as uncertain
+      return { ...error, line: llmLine };
+    });
+  };
+
+  // Extract searchable terms from error message
+  const extractSearchTerms = (message: string): string[] => {
+    const terms: string[] = [];
+    
+    // Extract field names in quotes: "age", "price", etc.
+    const quotedFields = message.match(/"([^"]+)"/g);
+    if (quotedFields) {
+      terms.push(...quotedFields.map(q => q.replace(/"/g, '').toLowerCase()));
+    }
+    
+    // Extract values that might appear in code: -5, 150, etc.
+    const numbers = message.match(/\b-?\d+\.?\d*\b/g);
+    if (numbers) {
+      terms.push(...numbers);
+    }
+    
+    // Extract key property names without quotes
+    const propertyPatterns = [
+      /(?:field|property|column)\s+['"]?(\w+)['"]?/i,
+      /['"]?(\w+)['"]?\s+(?:field|property|column)/i,
+    ];
+    
+    propertyPatterns.forEach(pattern => {
+      const match = message.match(pattern);
+      if (match && match[1]) {
+        terms.push(match[1].toLowerCase());
+      }
+    });
+    
+    return terms;
+  };
+
   // AI-powered analysis using Phase B backend
   const analyzeWithAI = async () => {
     if (!activeFile || !editorContent) return;
@@ -430,17 +507,22 @@ const DetectiveD = () => {
 
       // COMBINE local validation errors with AI errors (don't replace!)
       const localErrors = validateSyntax(editorContent, activeFile.name);
-      const allErrors = [...localErrors, ...rawErrors];
+      
+      // Correct AI error line numbers by searching actual file content
+      const correctedAIErrors = correctLineNumbers(rawErrors, editorContent);
+      
+      const allErrors = [...localErrors, ...correctedAIErrors];
 
       console.log('3. Local validation errors:', localErrors.length);
-      console.log('4. Raw AI errors:', rawErrors.length);
-      console.log('5. Combined errors before grouping:', allErrors.length);
+      console.log('4. Raw AI errors (before correction):', rawErrors.length);
+      console.log('5. Corrected AI errors:', correctedAIErrors.length);
+      console.log('6. Combined errors before grouping:', allErrors.length);
 
       // Group similar errors occurring on different lines
       const groupedErrors = groupSimilarErrors(allErrors);
 
-      console.log('6. Grouped errors:', groupedErrors.length);
-      console.log('7. Grouped errors details:', groupedErrors);
+      console.log('7. Grouped errors:', groupedErrors.length);
+      console.log('8. Grouped errors details:', groupedErrors);
       console.log('===== END DEBUG =====');
 
       setErrors(groupedErrors);

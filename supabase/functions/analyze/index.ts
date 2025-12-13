@@ -520,10 +520,12 @@ Allowed error types:
 Return a JSON array of 0–10 items, each like:
 
 {
-  "line": <number|null>,
-  "message": "<short description>",
+  "line": <estimated_line_or_null>,
+  "message": "<describe the error and mention the field/value causing it>",
   "category": "<one of the types above>"
 }
+
+NOTE: Line numbers are rough estimates since content may be truncated. Include field names and values in the message so they can be searched.
 
 If no semantic errors are confidently found, return [].
 
