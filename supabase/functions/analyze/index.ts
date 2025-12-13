@@ -286,25 +286,22 @@ async function callGroqAPI(
         temperature: 0.0,
         max_tokens: 1500,
         messages: [
-          { role: "system", content: `You are a strict semantic data validator.
+          { role: "system", content: `Data validator. Find ONLY obvious impossible values.
 
-CRITICAL: Your response MUST be ONLY a JSON array. Nothing else. No explanations, no text.
+Report ONLY:
+- Negative numbers for age/price/quantity
+- Percentages over 100
+- Dates that are clearly invalid
 
-RULES:
-1. Only analyze the file content provided by the user.
-2. Do not use or reference instructions, examples, or rules as data.
-3. Never guess. If unsure, return no errors.
-4. Never report formatting, syntax, spacing, indentation, or unit differences.
-5. Only report objective semantic problems:
-   - Type mismatch (string where number expected)
-   - Impossible values (negative ages, invalid dates, percent >100)
-   - Missing required fields (obvious only)
-   - Logical contradictions (end < start, total < sum of parts)
-6. If content appears valid or cannot be confidently analyzed, return: []
-7. Response MUST be valid JSON array. Never include explanations outside JSON.
+DO NOT report:
+- String values ("Large", "Small" etc are valid)
+- Missing fields (never assume what's required)
+- Type preferences (strings and numbers are both valid)
 
-IMPORTANT: Even if no errors, you MUST return []. Do NOT return text like "No errors found" or "Data is valid".
-Your entire response should be ONLY: [] or [{...}] - nothing else.`
+If unsure or data looks normal: return []
+
+Response format: JSON array only, no text.
+Example: [] or [{"line":1,"message":"age is -5","category":"impossible_value"}]`
  },
           { role: "user", content: prompt }
         ],
@@ -497,40 +494,15 @@ function buildPrompt(content: string, fileType: string, fileName: string): strin
       ? content.slice(0, MAX_CHARS) + "\n...[truncated]"
       : content;
 
-  return `
-FILE NAME: ${fileName}
-FILE TYPE: ${fileType}
+  return `File: ${fileName}
 
-Below is the DATA CONTENT for analysis. Only analyze this block.
-
-CONTENT_START
+Data:
 ${preview}
-CONTENT_END
 
-TASK:
-Identify only clear semantic errors in this content.
-
-Allowed error types:
-- "type_mismatch"
-- "impossible_value"
-- "missing_field"
-- "logic_error"
-- "inconsistent_structure"
-
-Return a JSON array of 0–10 items, each like:
-
-{
-  "line": <estimated_line_or_null>,
-  "message": "<describe the error and mention the field/value causing it>",
-  "category": "<one of the types above>"
+Find ONLY obvious impossible values (negative age/price, percent >100).
+DO NOT report: string values, missing fields, type opinions.
+Return: [] or [{"line":1,"message":"...","category":"impossible_value"}]`;
 }
-
-NOTE: Line numbers are rough estimates since content may be truncated. Include field names and values in the message so they can be searched.
-
-If no semantic errors are confidently found, return [].
-
-IMPORTANT : Return ONLY a JSON array. No text before or after.
-  `;
 }
 
 
