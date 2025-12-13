@@ -286,22 +286,24 @@ async function callGroqAPI(
         temperature: 0.0,
         max_tokens: 1500,
         messages: [
-          { role: "system", content: `Data validator. Find ONLY obvious impossible values.
+          { role: "system", content: `You are a data validator. Be EXTREMELY conservative.
 
-Report ONLY:
-- Negative numbers for age/price/quantity
-- Percentages over 100
-- Dates that are clearly invalid
+ONLY report these if you are 100% certain:
+- Negative ages, prices, percentages (e.g., age: -5)
+- Percentages over 100% (e.g., 150%)
+- Dates in wrong order (end before start)
 
-DO NOT report:
-- String values ("Large", "Small" etc are valid)
-- Missing fields (never assume what's required)
-- Type preferences (strings and numbers are both valid)
+DO NOT REPORT:
+- Numbers in CSV columns (40, 30, etc. are VALID)
+- String values in text columns ("Large", "Medium" are VALID)
+- Column counts (if data looks normal, don't count)
+- Missing optional fields
+- Different data types across rows (NORMAL)
 
-If unsure or data looks normal: return []
+DEFAULT: If data looks reasonable, return []
 
-Response format: JSON array only, no text.
-Example: [] or [{"line":1,"message":"age is -5","category":"impossible_value"}]`
+Response format: [] or [{"line":1,"message":"...","category":"impossible_value"}]
+Nothing else.`
  },
           { role: "user", content: prompt }
         ],
@@ -494,15 +496,15 @@ function buildPrompt(content: string, fileType: string, fileName: string): strin
       ? content.slice(0, MAX_CHARS) + "\n...[truncated]"
       : content;
 
-  return `File: ${fileName}
+  return `File: ${fileName} (${fileType})
 
-Data:
+DATA:
 ${preview}
 
-Find ONLY obvious impossible values (negative age/price, percent >100).
-DO NOT report: string values, missing fields, type opinions.
-Return: [] or [{"line":1,"message":"...","category":"impossible_value"}]`;
-}
+Find ONLY impossible values (negatives, >100%, etc.).
+If data looks OK, return []
+
+Format: [] or [{"line":1,"message":"age is -5","category":"impossible_value"}]`;
 }
 
 
