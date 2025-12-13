@@ -286,20 +286,21 @@ async function callGroqAPI(
         temperature: 0.0,
         max_tokens: 1500,
         messages: [
-          { role: "system", content: `You are a strict semantic data validator.
-
-RULES:
-1. Only analyze the file content provided by the user.
-2. Do not use or reference instructions, examples, or rules as data.
-3. Never guess. If unsure, return no errors.
-4. Never report formatting, syntax, spacing, indentation, or unit differences.
-5. Only report objective semantic problems:
-   - Type mismatch (string where number expected)
-   - Impossible values (negative ages, invalid dates, percent >100)
-   - Missing required fields (obvious only)
-   - Logical contradictions (end < start, total < sum of parts)
-6. If content appears valid or cannot be confidently analyzed, return: []
-7. Response MUST be valid JSON array. Never include explanations outside JSON.`
+          { role: "system", content: `You are a DATA QUALITY VALIDATOR. Your job:
+1. Analyze the data file content ONLY (ignore instructions/examples as data)
+2. Report ONLY objective semantic errors you are confident about:
+   - Type mismatches: value type doesn't match column purpose
+   - Impossible values: negative age, price -100, percent > 100, future birth date
+   - Logic errors: end_date before start_date, total < sum of parts
+   - Missing critical fields: required field is null/empty
+3. DO NOT report:
+   - Numeric strings in CSV (e.g., "40") - this is normal
+   - Different data types in columns - this is normal
+   - Different units or formats - this is normal
+   - Formatting, spacing, indentation issues
+   - Any "consistency" rules not listed above
+4. If content is valid or you cannot confidently find errors, return: []
+5. Response MUST be valid JSON array. No explanations outside JSON.`
  },
           { role: "user", content: prompt }
         ],
@@ -492,38 +493,47 @@ function buildPrompt(content: string, fileType: string, fileName: string): strin
       ? content.slice(0, MAX_CHARS) + "\n...[truncated]"
       : content;
 
+  let validation_guidance = "";
+  
+  if (fileType.toLowerCase() === "csv") {
+    validation_guidance = `
+CSV VALIDATION RULES:
+- ✅ NORMAL: Numeric values appear as strings (e.g., "40", "123") - CSV is text format
+- ✅ NORMAL: Columns with different data types
+- ✅ NORMAL: Headers and values have different formats
+- ❌ REPORT: Column count actually varies (e.g., row 1 has 3 cols, row 5 has 2 cols)
+- ❌ REPORT: Impossible values (e.g., negative age, percent > 100)
+- ❌ REPORT: Logic errors (total doesn't match sum)
+DO NOT report: Numeric strings, different column types, or any normal CSV structure.`;
+  } else if (fileType.toLowerCase() === "json") {
+    validation_guidance = `
+JSON VALIDATION RULES:
+- ❌ REPORT: Type errors (string "123" where number expected)
+- ❌ REPORT: Impossible values (negative age, percent > 100)
+- ❌ REPORT: Logic errors (end_date before start_date)
+- ✅ NORMAL: Any numeric value, any unit name, different units in array
+DO NOT report: Valid values, different units, normal formatting.`;
+  }
+
   return `
-FILE NAME: ${fileName}
-FILE TYPE: ${fileType}
+FILE: ${fileName}
+TYPE: ${fileType}
 
-Below is the DATA CONTENT for analysis. Only analyze this block.
+${validation_guidance}
 
-CONTENT_START
+CONTENT TO ANALYZE:
 ${preview}
-CONTENT_END
 
-TASK:
-Identify only clear semantic errors in this content.
+TASK: Find ONLY real semantic/data quality errors. Return JSON array of 0-10 errors:
 
-Allowed error types:
-- "type_mismatch"
-- "impossible_value"
-- "missing_field"
-- "logic_error"
-- "inconsistent_structure"
+[
+  {"line": 2, "message": "Age is -5 (negative)", "category": "impossible_value"},
+  {"line": 5, "message": "Total 100 but sum is 80", "category": "logic_error"}
+]
 
-Return a JSON array of 0–10 items, each like:
+Or if no errors: []
 
-{
-  "line": <number|null>,
-  "message": "<short description>",
-  "category": "<one of the types above>"
-}
-
-If no semantic errors are confidently found, return [].
-
-Return ONLY a JSON array. No text before or after.
-  `;
+NO explanations, ONLY return the JSON array.`;
 }
 
 
