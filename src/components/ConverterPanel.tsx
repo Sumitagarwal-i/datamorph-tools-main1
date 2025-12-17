@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, Download, Upload, Minimize2, RotateCcw, Wrench, Sparkles, Table2, Info, MoreVertical, FileCode, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { useRef, useState } from "react";
+import { useRef, useState, useLayoutEffect } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -73,6 +73,7 @@ export const ConverterPanel = ({
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
+  const [lineHeightPx, setLineHeightPx] = useState<number | null>(null);
   
   // Calculate number of lines in the textarea, with minimum to fill visible area
   const actualLineCount = value ? value.split('\n').length : 1;
@@ -84,6 +85,24 @@ export const ConverterPanel = ({
       lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
     }
   };
+
+  // Measure textarea line height to sync line number heights precisely
+  useLayoutEffect(() => {
+    const measure = () => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const cs = getComputedStyle(ta);
+      let lh = parseFloat(cs.lineHeight || "0");
+      if (!lh || Number.isNaN(lh)) {
+        const fs = parseFloat(cs.fontSize || "14");
+        lh = fs * 1.5;
+      }
+      setLineHeightPx(lh);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(value);
@@ -202,7 +221,7 @@ export const ConverterPanel = ({
     <div className="flex flex-col h-full max-w-full overflow-hidden">
       <div className="flex flex-col h-full bg-card border border-border rounded-lg shadow-lg overflow-hidden">
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border rounded-t-lg">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 text-primary">
               {isCsvOutput ? <FileText className="h-3.5 w-3.5" /> : <FileCode className="h-3.5 w-3.5" />}
@@ -237,11 +256,11 @@ export const ConverterPanel = ({
           {/* Dynamic Line Numbers */}
           <div 
             ref={lineNumbersRef}
-            className="absolute left-0 top-0 bottom-0 w-12 bg-muted/20 border-r border-border overflow-hidden select-none pointer-events-none z-10"
+            className="absolute left-0 top-0 bottom-0 w-12 bg-muted/20 border-r border-border overflow-hidden select-none pointer-events-none z-10 rounded-l-lg"
           >
             <div className="py-3 px-2 text-right leading-relaxed text-[13px] text-muted-foreground/50 font-mono">
               {Array.from({ length: lineCount }).map((_, i) => (
-                <div key={i} style={{ height: '1.5rem' }}>
+                <div key={i} style={{ height: lineHeightPx ? `${lineHeightPx}px` : '1.5rem' }}>
                   {i + 1}
                 </div>
               ))}
@@ -249,7 +268,7 @@ export const ConverterPanel = ({
           </div>
 
           {isCsvOutput && viewMode === 'table' && value.trim() ? (
-            <div className="absolute inset-0 pl-14 overflow-auto">
+            <div className="absolute inset-0 pl-14 overflow-auto rounded-r-lg">
               <div className="min-w-max p-4">
                 {(() => {
                   const { headers, rows } = parseCsvForTable(value);
@@ -288,7 +307,7 @@ export const ConverterPanel = ({
               </div>
             </div>
           ) : (
-            <div className="absolute inset-0 pl-14">
+            <div className="absolute inset-0 pl-14 rounded-r-lg">
               <Textarea
                 ref={textareaRef}
                 value={value}
@@ -317,7 +336,7 @@ export const ConverterPanel = ({
         </div>
 
         {/* Bottom Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-muted/30 border-t border-border">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-muted/30 border-t border-border rounded-b-lg">
           {/* Left Actions */}
           <div className="flex items-center gap-2">
             {allowFileUpload && !readOnly && (

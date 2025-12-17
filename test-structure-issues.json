@@ -1,0 +1,21 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "active": true,
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "active": false,
+    },
+  ],
+  "total": 2,
+  "metadata": {
+    "version": "1.0",
+    "last_updated": '2024-01-15',
+  }
+}

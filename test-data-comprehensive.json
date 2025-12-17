@@ -1,0 +1,35 @@
+[
+  {
+    "id": "123",
+    "name": "John Doe",
+    "age": null,
+    "email": "",
+    "score": NaN,
+    "active": "true",
+    "price": "99.99",
+    "created": "12/15/2024",
+    "metadata": {}
+  },
+  {
+    "id": "456",
+    "name": "Jane Smith",
+    "age": null,
+    "email": "",
+    "score": Infinity,
+    "active": "false",
+    "price": "199.50",
+    "created": "01-20-2024",
+    "metadata": {}
+  },
+  {
+    "id": "789",
+    "name": undefined,
+    "age": null,
+    "email": null,
+    "score": -5,
+    "active": true,
+    "price": 299,
+    "created": "2024-03-10",
+    "items": []
+  }
+]

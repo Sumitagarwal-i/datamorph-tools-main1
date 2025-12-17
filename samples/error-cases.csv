@@ -1,0 +1,6 @@
+Activity,Time Percentage (%),Description,Start Date,End Date
+Debugging Code,,"Time spent fixing bugs, errors, and data quality issues",2025-01-01,2025-01-15
+Writing New Code,120,Time spent writing new features and implementations,2025-02-01,2025-02-10
+Other Activities,-10,"Meetings, code review, documentation, etc.",2025-03-05,2025-03-04
+Refactoring,30,"Should be numeric percentage but is text",1850-12-31,2025-05-01
+Deployment,999999,Extreme outlier value,2025-06-01,2025-06-15

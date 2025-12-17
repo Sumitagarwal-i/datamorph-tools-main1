@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Sparkles } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Table, AlignLeft, Zap, ExternalLink } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Editor from "@monaco-editor/react";
@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
+import { DetectiveD as DetectiveDEngine, DetectiveFinding } from "@/lib/detectiveD";
+import { StructureValidator, StructureIssue, StructureValidationResult } from "@/lib/structureValidator";
 
 interface UploadedFile {
   id: string;
@@ -19,49 +21,50 @@ interface UploadedFile {
 }
 
 // File size limits
-const MAX_FILE_SIZE_MB = 5; // 5MB limit to stay within Groq API limits (~32K tokens)
+const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+// ============================================================================
+// UI TYPE - Convert Detective Finding to ErrorItem for display
+// ============================================================================
 interface ErrorItem {
   id: string;
-  message: string;
-  type: 'error' | 'warning';
-  category: string;
   line: number;
-  confidence?: number;
+  column?: number;
+  type: 'error' | 'warning';
+  message: string;
+  category?: string;
+  source?: 'detective';
+  severity?: 'error' | 'warning' | 'info';
+  confidence?: 'high' | 'medium' | 'low';
   explanation?: string;
   suggestions?: string[];
-  affectedLines?: number[];
-  occurrences?: number;
-  source: 'local' | 'ai'; // Track whether error is from local parser or AI analysis
-  severity?: 'critical' | 'high' | 'medium' | 'low'; // AI-provided severity
+  
+  // Detective D specific properties
+  evidence?: {
+    observed?: string;
+    expected_range?: string;
+    expected?: string;
+    context?: string;
+    statistic?: string;
+  };
+  whyItMatters?: string;
+  suggestedAction?: string;
 }
 
-const getFileIcon = (fileName: string) => {
-  const extension = fileName.split('.').pop()?.toLowerCase();
-  switch (extension) {
-    case 'json':
-      return <FileJson className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2.2} />;
-    case 'csv':
-      return <FileText className="h-3.5 w-3.5 text-blue-400" strokeWidth={2.2} />;
-    case 'xml':
-      return <FileCode className="h-3.5 w-3.5 text-orange-400" strokeWidth={2.2} />;
-    case 'yaml':
-    case 'yml':
-      return <FileCode className="h-3.5 w-3.5 text-yellow-400" strokeWidth={2.2} />;
-    default:
-      return <FileText className="h-3.5 w-3.5 text-slate-400" strokeWidth={2.2} />;
-  }
-};
+interface TableView {
+  columns: string[];
+  rows: string[][];
+  error?: string;
+}
 
-// Define custom Monaco theme with professional syntax highlighting
+// Custom Monaco theme definition
 const defineCustomTheme = (monaco: any) => {
   monaco.editor.defineTheme('detective-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      // JSON/General
-      { token: 'string', foreground: 'CE9178' },           // Strings - coral
+      { token: 'string', foreground: 'CE9178' },          // Strings - coral
       { token: 'string.key.json', foreground: '9CDCFE' }, // JSON keys - light blue
       { token: 'keyword', foreground: '569CD6' },          // Keywords - blue
       { token: 'keyword.json', foreground: '569CD6' },
@@ -108,11 +111,17 @@ const DetectiveD = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [selectedErrorId, setSelectedErrorId] = useState<string | null>(null);
+  const [selectedStructureIssue, setSelectedStructureIssue] = useState<StructureIssue | null>(null);
   const [editorContent, setEditorContent] = useState<string>("");
   const [errors, setErrors] = useState<ErrorItem[]>([]);
   const [lastValidationTime, setLastValidationTime] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisMode, setAnalysisMode] = useState<'local' | 'ai'>('local');
+  const [structureIssues, setStructureIssues] = useState<StructureIssue[]>([]);
+  const [hasStructureErrors, setHasStructureErrors] = useState(false);
+  const [isFixingStructure, setIsFixingStructure] = useState(false);
+  const [isRealTimeValidating, setIsRealTimeValidating] = useState(false);
+  const [validationTimeoutId, setValidationTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
 
   // Check authentication on mount
   useEffect(() => {
@@ -162,6 +171,9 @@ const DetectiveD = () => {
         setUploadedFiles(prev => [...prev, newFile]);
         setActiveFileId(newFile.id);
         
+        // Automatically validate structure on upload
+        validateFileStructure(content, file.name);
+        
         toast.success('File uploaded successfully', {
           description: `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
           duration: 3000,
@@ -174,11 +186,20 @@ const DetectiveD = () => {
   };
 
   const handleReset = () => {
+    // Clear validation timeout
+    if (validationTimeoutId) {
+      clearTimeout(validationTimeoutId);
+      setValidationTimeoutId(null);
+    }
+    
     setUploadedFiles([]);
     setActiveFileId(null);
     setEditorContent("");
     setErrors([]);
+    setStructureIssues([]);
+    setHasStructureErrors(false);
     setSelectedErrorId(null);
+    setSelectedStructureIssue(null);
     setLastValidationTime(null);
     // Clear file input to allow re-uploading the same file
     if (fileInputRef.current) {
@@ -203,408 +224,505 @@ const DetectiveD = () => {
     }
   }, [activeFile]);
 
-  // Syntax validation function
-  const validateSyntax = (content: string, fileName: string): ErrorItem[] => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    const detectedErrors: ErrorItem[] = [];
+  // ============================================================================
+  // NOTE: Deep Dive / AI Analysis REMOVED
+  // All analysis is now deterministic via Detective D engine running locally
+  // Real-time validation happens automatically - no external API calls
+  // ============================================================================
+  // Manual analysis function - triggered by button click only
+  // ============================================================================
+
+  const runAnalysis = async () => {
+    if (!activeFile || !editorContent || editorContent.trim().length === 0) {
+      setErrors([]);
+      toast.info('No data to analyze', {
+        description: 'Please upload or paste data first',
+        duration: 3000
+      });
+      return;
+    }
 
     try {
-      switch (extension) {
-        case 'json':
-          // JSON validation
-          try {
-            JSON.parse(content);
-          } catch (e: any) {
-            const message = e.message;
-            const posMatch = message.match(/position (\d+)/);
-            let line = 1;
-            
-            if (posMatch) {
-              const pos = parseInt(posMatch[1], 10);
-              const lines = content.substring(0, pos).split('\n');
-              line = lines.length;
-            }
-
-            let errorMsg = 'Invalid JSON syntax';
-            let suggestion = 'Check for missing brackets, commas, or quotes';
-            
-            if (message.includes('Unexpected token')) {
-              const token = message.match(/Unexpected token (.)/)?.[1];
-              errorMsg = `Unexpected token ${token || ''}`;
-              suggestion = `Remove or correct the unexpected character at line ${line}`;
-            } else if (message.includes('Unexpected end')) {
-              errorMsg = 'Unexpected end of JSON';
-              suggestion = 'Check for unclosed brackets, braces, or quotes';
-            } else if (message.includes('Unexpected string')) {
-              errorMsg = 'Unexpected string';
-              suggestion = 'Add a comma before this property or check for extra quotes';
-            }
-
-            detectedErrors.push({
-              id: Date.now().toString(),
-              message: errorMsg,
-              type: 'error',
-              category: 'Syntax',
-              line: line,
-              confidence: 95,
-              source: 'local'
-            });
-          }
-          break;
-
-        case 'csv':
-          // CSV validation - basic check
-          const lines = content.split('\n').filter(l => l.trim());
-          if (lines.length === 0) break;
-
-          const firstRowCols = lines[0].split(',').length;
-          lines.forEach((line, idx) => {
-            const cols = line.split(',').length;
-            if (cols !== firstRowCols) {
-              detectedErrors.push({
-                id: `csv-${idx}`,
-                message: `Inconsistent column count`,
-                source: 'local',
-                type: 'warning',
-                category: 'Format',
-                line: idx + 1,
-                confidence: 85
-              });
-            }
-          });
-          break;
-
-        case 'xml':
-          // XML validation using DOMParser
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(content, 'application/xml');
-          const errorNode = xmlDoc.querySelector('parsererror');
-          
-          if (errorNode) {
-            const errorText = errorNode.textContent || 'XML parsing error';
-            const lineMatch = errorText.match(/line (\d+)/i);
-            const line = lineMatch ? parseInt(lineMatch[1], 10) : 1;
-
-            detectedErrors.push({
-              id: Date.now().toString(),
-              message: 'Invalid XML syntax',
-              type: 'error',
-              category: 'Syntax',
-              line: line,
-              confidence: 90,
-              source: 'local'
-            });
-          }
-          break;
-
-        default:
-          // No validation for unsupported types
-          break;
-      }
-    } catch (e) {
-      console.error('Validation error:', e);
-    }
-
-    return detectedErrors;
-  };
-
-  // Group similar errors occurring on different lines
-  const groupSimilarErrors = (errors: ErrorItem[]): ErrorItem[] => {
-    const errorGroups = new Map<string, ErrorItem>();
-
-    errors.forEach(error => {
-      // Create a key based on message and category (ignore line number)
-      const key = `${error.message}-${error.category}-${error.type}`;
+      setIsAnalyzing(true);
       
-      if (errorGroups.has(key)) {
-        const existing = errorGroups.get(key)!;
-        // Add line to affected lines
-        if (!existing.affectedLines) {
-          existing.affectedLines = [existing.line];
-        }
-        if (!existing.affectedLines.includes(error.line)) {
-          existing.affectedLines.push(error.line);
-        }
-        existing.occurrences = (existing.occurrences || 1) + 1;
-        // Keep the explanation and suggestions from the first occurrence
-        if (!existing.explanation && error.explanation) {
-          existing.explanation = error.explanation;
-        }
-        if ((!existing.suggestions || existing.suggestions.length === 0) && error.suggestions) {
-          existing.suggestions = error.suggestions;
-        }
-      } else {
-        errorGroups.set(key, {
-          ...error,
-          affectedLines: [error.line],
-          occurrences: 1,
-        });
-      }
-    });
-
-    return Array.from(errorGroups.values()).sort((a, b) => a.line - b.line);
-  };
-
-  // Correct line numbers by searching actual file content
-  const correctLineNumbers = (errors: ErrorItem[], fileContent: string): ErrorItem[] => {
-    const lines = fileContent.split('\n');
-    
-    return errors.map(error => {
-      // If line number is already accurate (from local validation), keep it
-      if (error.source === 'local') {
-        return error;
-      }
+      // Run Detective D engine
+      const engine = new DetectiveDEngine(editorContent, activeFile.name);
+      const findings = await engine.analyze();
       
-      // For AI errors, try to find the actual line
-      const llmLine = error.line || 1;
-      
-      // Extract key terms from error message to search for
-      const searchTerms = extractSearchTerms(error.message);
-      
-      if (searchTerms.length === 0) {
-        // No searchable terms, keep LLM's guess
-        return error;
-      }
-      
-      // Search for the error near the LLM's guessed line first (within ±10 lines)
-      const searchStart = Math.max(0, llmLine - 11);
-      const searchEnd = Math.min(lines.length, llmLine + 10);
-      
-      for (let i = searchStart; i < searchEnd; i++) {
-        const lineContent = lines[i].toLowerCase();
-        if (searchTerms.some(term => lineContent.includes(term))) {
-          return { ...error, line: i + 1 };
-        }
-      }
-      
-      // If not found nearby, search entire file
-      for (let i = 0; i < lines.length; i++) {
-        const lineContent = lines[i].toLowerCase();
-        if (searchTerms.some(term => lineContent.includes(term))) {
-          return { ...error, line: i + 1 };
-        }
-      }
-      
-      // Could not find, keep LLM's guess but mark as uncertain
-      return { ...error, line: llmLine };
-    });
-  };
-
-  // Extract searchable terms from error message
-  const extractSearchTerms = (message: string): string[] => {
-    const terms: string[] = [];
-    
-    // Extract field names in quotes: "age", "price", etc.
-    const quotedFields = message.match(/"([^"]+)"/g);
-    if (quotedFields) {
-      terms.push(...quotedFields.map(q => q.replace(/"/g, '').toLowerCase()));
-    }
-    
-    // Extract values that might appear in code: -5, 150, etc.
-    const numbers = message.match(/\b-?\d+\.?\d*\b/g);
-    if (numbers) {
-      terms.push(...numbers);
-    }
-    
-    // Extract key property names without quotes
-    const propertyPatterns = [
-      /(?:field|property|column)\s+['"]?(\w+)['"]?/i,
-      /['"]?(\w+)['"]?\s+(?:field|property|column)/i,
-    ];
-    
-    propertyPatterns.forEach(pattern => {
-      const match = message.match(pattern);
-      if (match && match[1]) {
-        terms.push(match[1].toLowerCase());
-      }
-    });
-    
-    return terms;
-  };
-
-  // AI-powered analysis using Phase B backend
-  const analyzeWithAI = async () => {
-    if (!activeFile || !editorContent) return;
-
-    setIsAnalyzing(true);
-    setAnalysisMode('ai');
-    
-    try {
-      const extension = activeFile.name.split('.').pop()?.toLowerCase();
-      let fileType = 'auto';
-      if (extension === 'json') fileType = 'json';
-      else if (extension === 'csv') fileType = 'csv';
-      else if (extension === 'xml') fileType = 'xml';
-      else if (extension === 'yaml' || extension === 'yml') fileType = 'yaml';
-
-      const requestPayload = {
-        content: editorContent,
-        file_type: fileType,
-        file_name: activeFile.name,
-      };
-      
-      const requestBody = JSON.stringify(requestPayload);
-      const requestSize = new Blob([requestBody]).size;
-      
-      console.log('Sending AI analysis request', {
-        fileSize: `${(requestSize / 1024).toFixed(2)}KB`,
-        contentLength: editorContent.length,
-        fileType,
-        endpoint: 'Supabase Edge Function: analyze',
-      });
-
-      // Call Supabase Edge Function (no more 413 errors!)
-      const response = await fetch('https://emvtxsjzxcpluflrdyut.supabase.co/functions/v1/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtdnR4c2p6eGNwbHVmbHJkeXV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MjQ5MjUsImV4cCI6MjA3OTIwMDkyNX0.KWfgtAvdCtk2aETI6KzVjK5G_Anxn3cGeHvJFoGTxRo`,
-        },
-        body: requestBody,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText,
-        });
-        throw new Error(`API error ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      console.log('AI analysis response:', {
-        status: response.status,
-        errorsCount: result.errors?.length || 0,
-        rawResponse: result,
-      });
-      
-      console.log('===== DEBUGGING DEEP DIVE =====');
-      console.log('1. Raw API response errors:', result.errors);
-      console.log('2. Response type:', typeof result);
-      console.log('3. Response keys:', Object.keys(result));
-      console.log('4. Errors array:', Array.isArray(result.errors), 'Length:', result.errors?.length);
-      
-      // Transform API response to ErrorItem format
-      const rawErrors: ErrorItem[] = (result.errors || []).map((err: any, idx: number) => ({
-        id: `ai-${Date.now()}-${idx}`,
-        message: err.message || err.description || 'Unknown error',
-        type: err.type === 'warning' ? 'warning' : 'error',
-        category: err.category || err.type || 'General',
-        line: err.line || err.position?.line || 1,
-        confidence: typeof err.confidence === 'number' ? err.confidence * 100 : 85,
-        explanation: err.explanation || err.details || '',
-        suggestions: Array.isArray(err.suggestions) 
-          ? err.suggestions.map((s: any) => 
-              typeof s === 'string' ? s : (s.description || s.fix_code || s.code_snippet || '')
-            ).filter(Boolean)
-          : [],
-        source: 'ai',
-        severity: err.severity || 'medium',
+      // Convert findings to ErrorItem for display
+      const displayItems: ErrorItem[] = findings.map(finding => ({
+        id: finding.id,
+        line: finding.location.row || 1, // Detective D already provides correct line numbers
+        column: finding.location.column ? Number(finding.location.column) : undefined,
+        type: finding.severity === 'error' ? 'error' : 'warning',
+        message: finding.summary,
+        category: finding.category,
+        source: 'detective',
+        severity: finding.severity as 'error' | 'warning' | 'info',
+        confidence: finding.confidence as 'high' | 'medium' | 'low',
+        explanation: `${finding.evidence.observed ? `Observed: ${JSON.stringify(finding.evidence.observed)}. ` : ''}${finding.why_it_matters}`,
+        suggestions: [finding.suggested_action],
+        
+        // Include Detective D's detailed evidence
+        evidence: finding.evidence,
+        whyItMatters: finding.why_it_matters,
+        suggestedAction: finding.suggested_action
       }));
-
-      // COMBINE local validation errors with AI errors (don't replace!)
-      const localErrors = validateSyntax(editorContent, activeFile.name);
       
-      // Correct AI error line numbers by searching actual file content
-      const correctedAIErrors = correctLineNumbers(rawErrors, editorContent);
-      
-      const allErrors = [...localErrors, ...correctedAIErrors];
-
-      console.log('3. Local validation errors:', localErrors.length);
-      console.log('4. Raw AI errors (before correction):', rawErrors.length);
-      console.log('5. Corrected AI errors:', correctedAIErrors.length);
-      console.log('6. Combined errors before grouping:', allErrors.length);
-
-      // Group similar errors occurring on different lines
-      const groupedErrors = groupSimilarErrors(allErrors);
-
-      console.log('7. Grouped errors:', groupedErrors.length);
-      console.log('8. Grouped errors details:', groupedErrors);
-      console.log('===== END DEBUG =====');
-
-      setErrors(groupedErrors);
+      setErrors(displayItems);
       setLastValidationTime(Date.now());
       
-    } catch (error: any) {
-      console.error('AI analysis failed:', error);
-      
-      // Handle 413 Content Too Large error
-      if (error.message?.includes('413')){
-        toast.error('Request rejected by server (413)', {
-          description: `Your file is ${(editorContent.length / 1024).toFixed(1)}KB. If still too large, try: 1) Remove comments, 2) Split into smaller files, 3) Check internet connection.`,
-          duration: 7000,
-        });
-      } else if (error.message?.includes('API error 413')) {
-        toast.error('Content size exceeds server limit', {
-          description: 'The server rejected your request. Try removing unnecessary content or splitting the file.',
-          duration: 6000,
-        });
-      } else if (error.message?.includes('API error 500')) {
-        toast.error('Server processing error', {
-          description: 'The backend encountered an error. Please try again or contact support.',
-          duration: 6000,
-        });
-      } else if (error.message?.includes('Failed to fetch')) {
-        toast.error('Network error - check your connection', {
-          description: 'The request was blocked or your connection was interrupted.',
-          duration: 6000,
+      // Show feedback toast
+      if (displayItems.length > 0) {
+        toast.info('Analysis complete', {
+          description: `Found ${displayItems.length} issue${displayItems.length !== 1 ? 's' : ''} in ${activeFile.name}`,
+          duration: 3000
         });
       } else {
-        // Show helpful message - API only works when deployed
-        toast.info('AI analysis unavailable', {
-          description: 'Check your internet connection or try again later. Local validation is still available.',
-          duration: 4000,
+        toast.success('Analysis complete', {
+          description: 'No issues found! Data looks good.',
+          duration: 3000
         });
       }
       
-      // Fall back to local validation
-      const localErrors = validateSyntax(editorContent, activeFile.name);
-      const groupedLocalErrors = groupSimilarErrors(localErrors);
-      setErrors(groupedLocalErrors);
-      setAnalysisMode('local');
+      if (selectedErrorId && !displayItems.find(e => e.id === selectedErrorId)) {
+        setSelectedErrorId(null);
+      }
+      if (selectedStructureIssue && !structureIssues.find(i => i.id === selectedStructureIssue.id)) {
+        setSelectedStructureIssue(null);
+      }
+    } catch (err) {
+      console.error('[Detective D] Analysis error:', err);
+      toast.error('Analysis failed', {
+        description: 'Detective D encountered an error during analysis',
+        duration: 4000
+      });
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // Validate content when it changes (with debounce)
-  useEffect(() => {
-    if (!activeFile || !editorContent) {
-      setErrors([]);
-      setSelectedErrorId(null);
-      setLastValidationTime(null);
-      return;
+  // ============================================================================
+  // STRUCTURE VALIDATION - Runs automatically on file upload
+  // ============================================================================
+
+  const validateFileStructure = async (content: string, fileName: string) => {
+    try {
+      const extension = fileName.split('.').pop()?.toLowerCase();
+      let fileType: 'json' | 'csv' | 'xml' | 'yaml';
+      
+      switch (extension) {
+        case 'json':
+          fileType = 'json';
+          break;
+        case 'csv':
+          fileType = 'csv';
+          break;
+        case 'xml':
+          fileType = 'xml';
+          break;
+        case 'yaml':
+        case 'yml':
+          fileType = 'yaml';
+          break;
+        default:
+          fileType = 'json'; // Default fallback
+      }
+      
+      console.log('Validating structure for:', fileName, 'as', fileType);
+      console.log('Content length:', content.length);
+      
+      const validator = new StructureValidator(content, fileType);
+      const result = validator.validate();
+      
+      console.log('Validation result:', {
+        isValid: result.isValid,
+        issueCount: result.issues.length,
+        issues: result.issues,
+        summary: result.summary
+      });
+      
+      setStructureIssues(result.issues);
+      setHasStructureErrors(!result.isValid);
+      
+      if (!result.isValid) {
+        const errorCount = result.summary.errors;
+        const warningCount = result.summary.warnings;
+        const fixableCount = result.summary.autoFixable;
+        
+        console.log('Structure issues found:', {
+          errors: errorCount,
+          warnings: warningCount,
+          fixable: fixableCount
+        });
+        
+        toast.warning('Structure issues detected', {
+          description: `${errorCount} error(s), ${warningCount} warning(s). ${fixableCount} can be auto-fixed.`,
+          duration: 5000
+        });
+      } else {
+        console.log('Structure validation passed');
+        toast.success('Structure validated', {
+          description: 'File structure is valid and ready for analysis',
+          duration: 3000
+        });
+      }
+    } catch (error) {
+      console.error('Structure validation failed:', error);
+      
+      // Set fallback structure issues to make Fix All available
+      setHasStructureErrors(true);
+      setStructureIssues([{
+        id: 'validation-error',
+        type: 'error',
+        pattern: 'ValidationError',
+        message: 'Structure validation failed - manual review required',
+        line: 1,
+        column: 1,
+        originalText: '',
+        suggestedFix: '',
+        canAutoFix: true,
+        evidence: {
+          observed: 'Validation error',
+          context: fileName,
+          ruleViolated: 'Structure validation'
+        }
+      }]);
+      
+      toast.error('Structure validation failed', {
+        description: 'Could not validate file structure - but Fix All is available',
+        duration: 4000
+      });
+    }
+  };
+
+  // ============================================================================
+  // REAL-TIME VALIDATION - Runs as user edits
+  // ============================================================================
+
+  const debouncedValidateStructure = async (content: string, fileName: string) => {
+    // Clear existing timeout
+    if (validationTimeoutId) {
+      clearTimeout(validationTimeoutId);
     }
 
-    // Debounce validation for 300ms
-    const timeoutId = setTimeout(() => {
-      const validationErrors = validateSyntax(editorContent, activeFile.name);
-      const groupedErrors = groupSimilarErrors(validationErrors);
-      setErrors(groupedErrors);
-      setLastValidationTime(Date.now());
-      setAnalysisMode('local');
+    // Set new timeout for debounced validation
+    const timeoutId = setTimeout(async () => {
+      if (!content || !fileName) return;
       
-      // Clear selected error if it no longer exists
-      if (selectedErrorId && !groupedErrors.find(e => e.id === selectedErrorId)) {
-        setSelectedErrorId(null);
+      try {
+        setIsRealTimeValidating(true);
+        
+        const extension = fileName.split('.').pop()?.toLowerCase();
+        let fileType: 'json' | 'csv' | 'xml' | 'yaml';
+        
+        switch (extension) {
+          case 'json': fileType = 'json'; break;
+          case 'csv': fileType = 'csv'; break;
+          case 'xml': fileType = 'xml'; break;
+          case 'yaml':
+          case 'yml': fileType = 'yaml'; break;
+          default: fileType = 'json';
+        }
+        
+        const validator = new StructureValidator(content, fileType);
+        const result = validator.validate();
+        
+        setStructureIssues(result.issues);
+        setHasStructureErrors(!result.isValid);
+        
+        // Update the file content in state to match editor
+        if (activeFile) {
+          setUploadedFiles(prev => prev.map(f => 
+            f.id === activeFile.id 
+              ? { ...f, content }
+              : f
+          ));
+        }
+      } catch (error) {
+        console.error('Real-time validation failed:', error);
+      } finally {
+        setIsRealTimeValidating(false);
       }
-      
-      // Smart auto-trigger for AI analysis if critical errors found
-      const criticalErrors = validationErrors.filter(e => e.type === 'error');
-      if (criticalErrors.length > 0 && !isAnalyzing) {
-        // Auto-trigger AI analysis if file has critical errors
-        // This is disabled by default (user can uncomment to enable)
-        // analyzeWithAI();
-      }
-    }, 300);
+    }, 500); // 500ms debounce
 
-    return () => clearTimeout(timeoutId);
-  }, [editorContent, activeFile]);
+    setValidationTimeoutId(timeoutId);
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      setEditorContent(value);
+      
+      // Run real-time structure validation
+      if (activeFile) {
+        debouncedValidateStructure(value, activeFile.name);
+      }
+    }
+  };
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutId) {
+        clearTimeout(validationTimeoutId);
+      }
+    };
+  }, [validationTimeoutId]);
 
   // Generate contextual suggestions based on error
+  // Extract error context from content for detailed analysis
+  const getErrorContext = (error: ErrorItem, content: string, fileName: string) => {
+    const lines = content.split('\n');
+    const errorLine = lines[error.line - 1] || '';
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    
+    let actualValue = '';
+    let expectedType = '';
+    let fieldPath = '';
+    let suggestion = '';
+    let whyMatters = '';
+    
+    // Use Detective D's evidence and context if available
+    if (error.evidence) {
+      actualValue = error.evidence.observed || '';
+      expectedType = error.evidence.expected_range || error.evidence.expected || '';
+      fieldPath = error.evidence.context || '';
+      
+      // Use Detective D's statistic if available for better context
+      if (error.evidence.statistic) {
+        actualValue += ` (${error.evidence.statistic})`;
+      }
+    }
+    
+    // Use Detective D's explanations and suggestions
+    if (error.whyItMatters) {
+      whyMatters = error.whyItMatters;
+    } else if (error.explanation) {
+      whyMatters = error.explanation;
+    }
+    
+    if (error.suggestedAction) {
+      suggestion = error.suggestedAction;
+    } else if (error.suggestions && error.suggestions.length > 0) {
+      suggestion = error.suggestions[0];
+    }
+
+    // If Detective D didn't provide values, try to extract from content
+    if (!actualValue || !fieldPath) {
+      if (extension === 'json') {
+      try {
+        // Try to parse JSON to get structured field path
+        const parsed = JSON.parse(content);
+        
+        // Try to extract field name and value from the line
+        const fieldMatch = errorLine.match(/"([^"]+)"\s*:\s*(.+?)(?:,|$)/);
+        if (fieldMatch) {
+          fieldPath = fieldMatch[1];
+          actualValue = fieldMatch[2].trim().replace(/,$/, '');
+        }
+
+        // Try to extract field name from message
+        if (!fieldPath) {
+          // Common patterns: "age is -5", '"email" is missing', 'price: invalid'
+          const fieldInMessage = error.message.match(/"([^"]+)"|'([^']+)'|^(\w+)\s+(?:is|has|must|should)/i);
+          if (fieldInMessage) {
+            fieldPath = fieldInMessage[1] || fieldInMessage[2] || fieldInMessage[3];
+            
+            // Try to find the actual value in the JSON
+            if (Array.isArray(parsed)) {
+              // Search in array of objects
+              for (const item of parsed) {
+                if (item && typeof item === 'object' && fieldPath in item) {
+                  actualValue = JSON.stringify(item[fieldPath]);
+                  break;
+                }
+              }
+            } else if (parsed && typeof parsed === 'object' && fieldPath in parsed) {
+              actualValue = JSON.stringify(parsed[fieldPath]);
+            }
+          }
+        }
+      } catch {
+        // JSON parsing failed, fall back to regex
+        const fieldMatch = errorLine.match(/"([^"]+)"\s*:\s*(.+?)(?:,|$)/);
+        if (fieldMatch) {
+          fieldPath = fieldMatch[1];
+          actualValue = fieldMatch[2].trim().replace(/,$/, '');
+        }
+      }
+
+      // Determine expected type based on category
+      const categoryLower = error.category?.toLowerCase() || '';
+      
+      if (categoryLower.includes('type') || categoryLower.includes('mismatch')) {
+        if (actualValue.startsWith('"') && actualValue.endsWith('"')) {
+          expectedType = 'number';
+          const numValue = actualValue.replace(/"/g, '');
+          if (!isNaN(Number(numValue)) && !suggestion) {
+            suggestion = `Change "${fieldPath}": ${actualValue} → "${fieldPath}": ${numValue}`;
+          }
+          if (!whyMatters) {
+            whyMatters = `"${fieldPath}" must be numeric to support calculations and comparisons.`;
+          }
+        } else if (!actualValue.startsWith('"') && isNaN(Number(actualValue))) {
+          expectedType = 'string';
+          if (!suggestion) {
+            suggestion = `Change "${fieldPath}": ${actualValue} → "${fieldPath}": "${actualValue}"`;
+          }
+          if (!whyMatters) {
+            whyMatters = `Text values must be wrapped in quotes for valid JSON.`;
+          }
+        }
+      } else if (categoryLower.includes('impossible') || categoryLower.includes('value') || categoryLower.includes('range')) {
+        // Extract the actual problematic value from the message if available
+        const valueMatch = error.message.match(/(?:is|has|value)\s+["']?(-?\d+\.?\d*)["']?/i);
+        if (valueMatch && !actualValue) {
+          actualValue = valueMatch[1];
+        }
+        
+        if (actualValue.includes('-') || (valueMatch && parseFloat(valueMatch[1]) < 0)) {
+          expectedType = 'positive number';
+          if (!suggestion) {
+            suggestion = `Replace negative value with a valid positive number`;
+          }
+          if (!whyMatters) {
+            whyMatters = `${fieldPath ? `"${fieldPath}"` : 'This field'} cannot have negative values.`;
+          }
+        } else if (parseFloat(actualValue) > 100 && (error.message.toLowerCase().includes('percent') || categoryLower.includes('percent'))) {
+          expectedType = 'percentage (0-100)';
+          if (!suggestion) {
+            suggestion = `Change value to be between 0 and 100`;
+          }
+          if (!whyMatters) {
+            whyMatters = `Percentages must be within the valid range.`;
+          }
+        } else if (categoryLower.includes('impossible')) {
+          expectedType = 'valid value';
+          if (!whyMatters) {
+            whyMatters = `This value is logically impossible or semantically incorrect.`;
+          }
+        }
+      } else if (categoryLower.includes('logic')) {
+        expectedType = 'logically consistent value';
+        if (!whyMatters) {
+          whyMatters = `This creates a logical inconsistency in the data (e.g., end before start, total mismatch).`;
+        }
+      } else if (categoryLower.includes('missing') || categoryLower.includes('required')) {
+        expectedType = 'required value';
+        if (!suggestion) {
+          suggestion = `Add a value for "${fieldPath}"`;
+        }
+        if (!whyMatters) {
+          whyMatters = `This field is required and cannot be empty.`;
+        }
+      }
+      
+    } else if (extension === 'csv') {
+      const cells = errorLine.split(',');
+      const colMatch = error.message.match(/column (\d+)/i);
+      if (colMatch) {
+        const colIndex = parseInt(colMatch[1]) - 1;
+        actualValue = cells[colIndex] || '';
+        fieldPath = `Row ${error.line}, Column ${colMatch[1]}`;
+      } else {
+        // Try to extract field name from CSV header
+        const headerLine = lines[0];
+        const headers = headerLine.split(',');
+        const fieldInMessage = error.message.match(/"([^"]+)"|'([^']+)'|^(\w+)\s+/i);
+        if (fieldInMessage) {
+          const field = fieldInMessage[1] || fieldInMessage[2] || fieldInMessage[3];
+          const fieldIndex = headers.findIndex(h => h.trim().toLowerCase() === field.toLowerCase());
+          if (fieldIndex !== -1 && cells[fieldIndex]) {
+            actualValue = cells[fieldIndex].trim();
+            fieldPath = `${field} (Column ${fieldIndex + 1})`;
+          }
+        }
+      }
+      
+      if (error.category?.toLowerCase().includes('inconsistent') || error.category?.toLowerCase().includes('column')) {
+        expectedType = `consistent column count`;
+        if (!suggestion) {
+          suggestion = `Add or remove delimiters to match header row`;
+        }
+        if (!whyMatters) {
+          whyMatters = `All rows must have the same column count for proper parsing.`;
+        }
+      }
+    }
+    }
+
+    // Fallback suggestions for syntax errors (typically local parser errors)
+    if (!suggestion) {
+      if (error.message.includes('Unexpected token')) {
+        suggestion = 'Remove the unexpected character or add missing punctuation';
+        if (!whyMatters) {
+          whyMatters = 'Syntax errors prevent the file from being parsed correctly.';
+        }
+      } else if (error.message.includes('Unexpected end')) {
+        suggestion = 'Add the missing closing bracket, brace, or quote';
+        if (!whyMatters) {
+          whyMatters = 'Unclosed structures cause parsing failures.';
+        }
+      } else if (error.message.includes('comma')) {
+        suggestion = 'Add a comma between properties or array elements';
+        if (!whyMatters) {
+          whyMatters = 'Proper delimiters are required for valid syntax.';
+        }
+      } else {
+        suggestion = 'Review and correct the syntax at this line';
+        if (!whyMatters) {
+          whyMatters = 'Valid syntax is required for successful parsing.';
+        }
+      }
+    }
+
+    return {
+      actualValue,
+      expectedType,
+      fieldPath,
+      errorLine: errorLine.trim(),
+      suggestion,
+      whyMatters
+    };
+  };
+
+  // Get category display info
+  const getCategoryInfo = (category: string) => {
+    const categoryLower = category.toLowerCase();
+    
+    // Type-related errors
+    if (categoryLower.includes('type') || categoryLower.includes('mismatch')) {
+      return { color: 'text-red-400 bg-red-500/20 border-red-500/30', label: 'Type Mismatch' };
+    }
+    
+    // Value/range errors (including AI's "impossible_value" category)
+    if (categoryLower.includes('value') || categoryLower.includes('impossible') || 
+        categoryLower.includes('range') || categoryLower.includes('invalid')) {
+      return { color: 'text-orange-400 bg-orange-500/20 border-orange-500/30', label: 'Invalid Value' };
+    }
+    
+    // Missing/required field errors (including AI's "missing_critical" category)
+    if (categoryLower.includes('missing') || categoryLower.includes('required') || 
+        categoryLower.includes('empty') || categoryLower.includes('critical')) {
+      return { color: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30', label: 'Missing Field' };
+    }
+    
+    // Logic errors (including AI's "logic_error" category)
+    if (categoryLower.includes('logic') || categoryLower.includes('consistency') || 
+        categoryLower.includes('inconsistent') || categoryLower.includes('conflict')) {
+      return { color: 'text-blue-400 bg-blue-500/20 border-blue-500/30', label: 'Logic Error' };
+    }
+    
+    // Syntax/parse errors
+    if (categoryLower.includes('syntax') || categoryLower.includes('parse') || 
+        categoryLower.includes('format') || categoryLower.includes('structure')) {
+      return { color: 'text-purple-400 bg-purple-500/20 border-purple-500/30', label: 'Syntax Error' };
+    }
+    
+    // Generic/unknown category
+    return { color: 'text-gray-400 bg-gray-500/20 border-gray-500/30', label: category };
+  };
+
   const getSuggestions = (error: ErrorItem, fileName: string): string[] => {
     const extension = fileName.split('.').pop()?.toLowerCase();
     const suggestions: string[] = [];
@@ -675,10 +793,134 @@ const DetectiveD = () => {
     return extension || 'TEXT';
   };
 
+  // Get file icon based on extension
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'json':
+        return <FileJson className="h-3.5 w-3.5" />;
+      case 'csv':
+        return <FileText className="h-3.5 w-3.5" />;
+      case 'xml':
+      case 'yaml':
+      case 'yml':
+        return <FileCode className="h-3.5 w-3.5" />;
+      default:
+        return <FileText className="h-3.5 w-3.5" />;
+    }
+  };
+
   // Count lines in content
   const getLineCount = (content: string) => {
     return content.split('\n').length;
   };
+
+  // Parse CSV text into rows/columns (lightweight parser for table view)
+  const parseCsvForTable = (text: string) => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+    if (lines.length === 0) return { columns: [], rows: [], error: 'No rows to display' };
+
+    const parseLine = (line: string) => {
+      const cells: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          cells.push(current);
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      cells.push(current);
+      return cells;
+    };
+
+    const rows = lines.map(parseLine);
+    const columns = rows[0] || [];
+    const dataRows = rows.slice(1);
+    return { columns, rows: dataRows, error: null };
+  };
+
+  // Build table-ready data for supported types
+  const tableView = useMemo(() => {
+    if (!activeFile) return { columns: [], rows: [], error: 'No file loaded' };
+    const ext = activeFile.name.split('.').pop()?.toLowerCase();
+
+    try {
+      if (ext === 'csv') {
+        return parseCsvForTable(editorContent);
+      }
+
+
+      if (ext === 'json') {
+        const parsed = JSON.parse(editorContent);
+
+        // Helper to flatten one level of nested objects for table view
+        const flattenRow = (row: any) => {
+          const flat: Record<string, string> = {};
+          if (row && typeof row === 'object') {
+            for (const key of Object.keys(row)) {
+              const val = row[key];
+              if (val === null || val === undefined) {
+                flat[key] = '';
+              } else if (typeof val === 'object') {
+                flat[key] = JSON.stringify(val);
+              } else {
+                flat[key] = String(val);
+              }
+            }
+          }
+          return flat;
+        };
+
+        // Detect if the parsed value is an object containing an array of objects (e.g., { groceries: [...] })
+        const extractArrayFromObject = (obj: any): any[] | null => {
+          if (!obj || typeof obj !== 'object') return null;
+          const entries = Object.entries(obj);
+          for (const [, value] of entries) {
+            if (Array.isArray(value) && value.every((v) => v && typeof v === 'object')) {
+              return value as any[];
+            }
+          }
+          return null;
+        };
+
+        const makeRows = (arr: any[]) => {
+          const flatRows = arr.map(flattenRow);
+          const cols = Array.from(new Set(flatRows.flatMap((r) => Object.keys(r))));
+          const rows = flatRows.map((r) => cols.map((c) => r[c] ?? ''));
+          return { columns: cols, rows, error: null };
+        };
+
+        if (Array.isArray(parsed)) {
+          return makeRows(parsed);
+        }
+
+        if (parsed && typeof parsed === 'object') {
+          const nestedArray = extractArrayFromObject(parsed);
+          if (nestedArray) {
+            return makeRows(nestedArray);
+          }
+          return makeRows([parsed]);
+        }
+
+        return { columns: [], rows: [], error: 'JSON is not an object or array; cannot render table' };
+      }
+
+      return { columns: [], rows: [], error: 'Table view is available for CSV or JSON files' };
+    } catch (err: any) {
+      return { columns: [], rows: [], error: `Cannot render table: ${err?.message || 'Unknown error'}` };
+    }
+  }, [activeFile, editorContent]);
 
   // Format/Beautify content
   const handleBeautify = () => {
@@ -792,6 +1034,11 @@ const DetectiveD = () => {
     }
   }, [errors]);
 
+  // Reset to text view when switching files
+  useEffect(() => {
+    setViewMode('text');
+  }, [activeFileId]);
+
   // Scroll to error line when error is selected
   useEffect(() => {
     if (editorRef.current && selectedErrorId) {
@@ -853,22 +1100,54 @@ const DetectiveD = () => {
               <span className="text-xs font-medium">Upload</span>
             </Button>
 
-            {/* AI Analysis Button */}
-            {activeFile && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={analyzeWithAI}
-                disabled={isAnalyzing}
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground gap-1.5 px-3 shadow-lg shadow-primary/25"
-                title="AI-powered deep analysis - detects issues beyond basic syntax errors"
-              >
-                <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-                <span className="text-xs font-semibold">
-                  {isAnalyzing ? 'AI Analyzing...' : 'Deep Dive'}
-                </span>
-              </Button>
+            {/* Real-time Analysis Status */}
+            {activeFile && isAnalyzing && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 rounded-md">
+                <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"></div>
+                <span>Analyzing...</span>
+              </div>
             )}
+
+            {/* Real-time Validation Status */}
+            {activeFile && isRealTimeValidating && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-300 bg-orange-900/20 border border-orange-500/30 rounded-md">
+                <div className="h-2 w-2 rounded-full bg-orange-400 animate-pulse"></div>
+                <span>Validating...</span>
+              </div>
+            )}
+
+            {/* Structure Status Indicator */}
+            {activeFile && !isRealTimeValidating && structureIssues.length === 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-300 bg-green-900/20 border border-green-500/30 rounded-md">
+                <div className="h-2 w-2 rounded-full bg-green-400"></div>
+                <span>Structure OK</span>
+              </div>
+            )}
+
+            {/* Reset/Clear Button */}
+            
+            {/* Analyze Data Button */}
+            <Button
+              onClick={runAnalysis}
+              disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-4 py-2 font-medium"
+              title={hasStructureErrors 
+                ? "Analyze data (will attempt analysis despite structural issues)" 
+                : "Run comprehensive data analysis with Detective D"}
+            >
+              {isAnalyzing ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs font-medium">Analyzing...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4" />
+                  <span className="text-xs font-medium">Analyze Data</span>
+                </>
+              )}
+            </Button>
 
             {/* Reset/Clear Button */}
             <Button
@@ -961,40 +1240,146 @@ const DetectiveD = () => {
           {/* Header */}
           <div className="px-3 py-3 border-b border-[#1C1F22]">
             <h2 className="text-sm font-semibold text-[#E6E7E9]">
-              Errors ({errors.length})
+              Issues ({structureIssues.length + errors.length})
             </h2>
           </div>
           
           {/* Error Items */}
-          {errors.length > 0 ? (
+          {isAnalyzing ? (
+            <div className="px-3 py-16 text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="h-12 w-12 rounded-full border-4 border-[#1C1F22] border-t-primary animate-spin"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-semibold text-[#E6E7E9]">Analyzing your data...</div>
+                <div className="text-xs text-[#7A7F86]">Detective D is scanning for issues</div>
+              </div>
+            </div>
+          ) : (structureIssues.length > 0 || errors.length > 0) ? (
             <div className="py-1">
               {/* Info Banner */}
               <div className="px-3 py-2.5 bg-[#1A1D20] border-b border-[#1C1F22]">
                 <div className="text-xs space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[#E6E7E9]">
-                      {errors.filter(e => e.type === 'error').length} errors found
+                      {structureIssues.filter(i => i.type === 'error').length + errors.filter(e => e.type === 'error').length} errors found
                     </span>
-                    {errors.some(e => e.source === 'ai') && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/20 text-primary border border-primary/30">
-                        <Sparkles className="h-2.5 w-2.5" />
-                        AI Enhanced
-                      </span>
-                    )}
                   </div>
                   <div className="text-[#7A7F86]">
-                    {errors.some(e => e.source === 'ai') 
-                      ? 'AI found issues beyond basic syntax' 
-                      : 'Click "Deep Dive" for AI insights'
+                    {isRealTimeValidating 
+                      ? 'Validating structure in real-time...'
+                      : structureIssues.length > 0 
+                        ? 'Real-time structure validation active'
+                        : 'Real-time validation active — issues detected as you edit'
                     }
                   </div>
                 </div>
               </div>
               
-              {errors.map((error) => (
+              {/* Structure Issues First (if any) */}
+              {structureIssues.length > 0 && (
+                <>
+                  <div className="px-3 py-2 bg-[#1E1A00] border-b border-[#2A2400] flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-orange-400"></div>
+                    <span className="text-xs font-semibold text-orange-200 uppercase tracking-wide">
+                      Structure Issues ({structureIssues.length})
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-xs text-orange-300 bg-orange-500/20 px-2 py-1 rounded">
+                        Manual fixes needed
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Helpful instruction banner */}
+                  <div className="px-3 py-2 bg-orange-500/5 border-b border-orange-500/20">
+                    <div className="text-xs text-orange-300 space-y-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-orange-400">📝</span>
+                        <span className="font-medium">Click on any issue below to jump to the line in the editor</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-blue-400">📊</span>
+                        <span>Analysis can still run with structure issues, but fixing them improves accuracy</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {structureIssues.map((issue) => (
+                    <button
+                      key={issue.id}
+                      onClick={() => {
+                        setSelectedStructureIssue(issue);
+                        setSelectedErrorId(null); // Clear semantic error selection
+                        // Navigate to error line in editor
+                        if (editorRef.current) {
+                          editorRef.current.revealLineInCenter(issue.line);
+                          editorRef.current.setPosition({ lineNumber: issue.line, column: issue.column || 1 });
+                        }
+                      }}
+                      className={`
+                        w-full px-3 py-3 text-left transition-all
+                        hover:bg-[#1A1600] border-b border-orange-500/10
+                        ${
+                          selectedStructureIssue?.id === issue.id 
+                            ? 'bg-[#1A1600] border-l-4 border-orange-500' 
+                            : 'border-l-4 border-orange-500/30 hover:border-orange-500/50'
+                        }
+                      `}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {issue.type === 'error' ? (
+                              <CircleAlert className="h-4 w-4 text-red-400 flex-shrink-0" strokeWidth={2} />
+                            ) : (
+                              <TriangleAlert className="h-4 w-4 text-yellow-400 flex-shrink-0" strokeWidth={2} />
+                            )}
+                            <span className="text-xs font-medium text-orange-200">
+                              {issue.message}
+                            </span>
+                          </div>
+                          <ExternalLink className="h-3.5 w-3.5 text-orange-400/60 flex-shrink-0" />
+                        </div>
+                        
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="text-gray-400 font-mono bg-gray-800/50 px-2 py-1 rounded">
+                            Line {issue.line}:{issue.column}
+                          </span>
+                          <span className="text-gray-400 font-mono bg-gray-800/50 px-2 py-1 rounded">
+                            {issue.pattern}
+                          </span>
+                          {issue.type === 'error' ? (
+                            <span className="text-red-400 bg-red-500/10 px-2 py-1 rounded">
+                              ERROR
+                            </span>
+                          ) : (
+                            <span className="text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded">
+                              WARNING
+                            </span>
+                          )}
+                        </div>
+                        
+                        {issue.suggestedFix && issue.suggestedFix !== 'Manual review required' && (
+                          <div className="text-xs mt-2">
+                            <span className="text-green-400">🔧 Fix: </span>
+                            <span className="text-green-300">{issue.suggestedFix}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+              
+              {/* Semantic Errors (if structure is valid) */}
+              {structureIssues.length === 0 && errors.map((error) => (
                 <button
                   key={error.id}
-                  onClick={() => setSelectedErrorId(error.id)}
+                  onClick={() => {
+                    setSelectedErrorId(error.id);
+                    setSelectedStructureIssue(null); // Clear structure issue selection
+                  }}
                   className={`
                     w-full px-3 py-2 text-left transition-all
                     hover:bg-[#1A1D20]
@@ -1015,22 +1400,16 @@ const DetectiveD = () => {
                         <div className="text-sm font-medium text-[#E6E7E9] leading-tight">
                           {error.message}
                         </div>
-                        {error.source === 'ai' && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/20 text-primary border border-primary/30">
-                            <Sparkles className="h-2.5 w-2.5" />
-                            AI
-                          </span>
-                        )}
+
                       </div>
                       <div className="text-xs text-[#7A7F86] mt-1 flex items-center gap-1.5">
                         <span>{error.category}</span>
-                        {error.severity && error.source === 'ai' && (
+                        {error.severity && (
                           <>
                             <span>•</span>
                             <span className={`font-medium ${
-                              error.severity === 'critical' ? 'text-red-400' :
-                              error.severity === 'high' ? 'text-orange-400' :
-                              error.severity === 'medium' ? 'text-yellow-400' :
+                              error.severity === 'error' ? 'text-red-400' :
+                              error.severity === 'warning' ? 'text-yellow-400' :
                               'text-blue-400'
                             }`}>
                               {error.severity}
@@ -1038,10 +1417,7 @@ const DetectiveD = () => {
                           </>
                         )}
                         <span>•</span>
-                        <span>{error.occurrences && error.occurrences > 1 
-                          ? `Lines ${error.affectedLines?.join(', ')} (${error.occurrences}×)`
-                          : `Line ${error.line}`
-                        }</span>
+                        <span>Line {error.line}</span>
                       </div>
                     </div>
                   </div>
@@ -1050,14 +1426,21 @@ const DetectiveD = () => {
             </div>
           ) : (
             <div className="px-3 py-8 text-center space-y-3">
-              <div className="text-sm text-[#7A7F86]">✓ No issues found</div>
-              <div className="text-xs text-[#7A7F86]">The file looks valid.</div>
+              <div className="flex justify-center mb-3">
+                <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-sm font-semibold text-[#E6E7E9]">✓ No issues found</div>
+              <div className="text-xs text-[#7A7F86]">Your data looks clean and valid!</div>
               <div className="pt-4 border-t border-[#1C1F22]">
-                <div className="text-xs text-[#5A5F66] font-semibold mb-2">How it works:</div>
+                <div className="text-xs text-[#5A5F66] font-semibold mb-2">💡 Automatic Analysis:</div>
                 <div className="text-xs text-[#5A5F66] leading-relaxed space-y-1">
-                  <div>1. Upload a file (auto-detected)</div>
-                  <div>2. Get instant error feedback</div>
-                  <div>3. Click "Deep Dive" for AI insights</div>
+                  <div>✓ Analysis runs automatically on upload</div>
+                  <div>✓ Real-time scanning as you edit</div>
+                  <div>✓ No buttons needed - it just works!</div>
                 </div>
               </div>
             </div>
@@ -1081,6 +1464,22 @@ const DetectiveD = () => {
                 
                 {/* Right: Action Buttons */}
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
+                    title="Table view"
+                  >
+                    <Table className="h-3 w-3" strokeWidth={2} />
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setViewMode('text')}
+                    className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'text' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
+                    title="Text view"
+                  >
+                    <AlignLeft className="h-3 w-3" strokeWidth={2} />
+                    Text
+                  </button>
                   <button
                     onClick={handleBeautify}
                     className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
@@ -1142,8 +1541,8 @@ const DetectiveD = () => {
                     {/* Analysis mode */}
                     <div className="flex items-center gap-2">
                       <span className="text-[#7A7F86]">•</span>
-                      <span className={analysisMode === 'ai' ? 'text-primary font-medium' : ''}>
-                        {analysisMode === 'ai' ? 'AI Analysis' : 'Local Validation'}
+                      <span className="text-slate-300">
+                        Deterministic Validation
                       </span>
                     </div>
 
@@ -1156,66 +1555,99 @@ const DetectiveD = () => {
                 </div>
               )}
 
-              {/* Monaco Editor */}
+              {/* Editor / Table View */}
               <div className="flex-1 overflow-hidden relative">
-                <Editor
-                  key={activeFile.id}
-                  height="100%"
-                  language={getLanguage(activeFile.name)}
-                  value={editorContent}
-                  onChange={(value) => setEditorContent(value || "")}
-                  beforeMount={(monaco) => {
-                    // Define theme before editor mounts to prevent white flash
-                    defineCustomTheme(monaco);
-                  }}
-                  onMount={handleEditorDidMount}
-                  theme="detective-dark"
-                  loading={<div className="flex items-center justify-center h-full bg-[#0F1113] text-[#7A7F86]">Loading editor...</div>}
-                  options={{
-                    fontSize: 14,
-                    fontFamily: "JetBrains Mono, Fira Code, Consolas, monospace",
-                    lineHeight: 21,
-                    letterSpacing: 0,
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    renderLineHighlight: 'line',
-                    cursorStyle: 'line',
-                    cursorBlinking: 'smooth',
-                    cursorSmoothCaretAnimation: 'on',
-                    smoothScrolling: true,
-                    padding: { top: 16, bottom: 16 },
-                    lineNumbers: 'on',
-                    lineNumbersMinChars: 3,
-                    glyphMargin: true,
-                    folding: true,
-                    selectOnLineNumbers: true,
-                    roundedSelection: false,
-                    readOnly: false,
-                    automaticLayout: true,
-                    wordWrap: 'off',
-                    wrappingIndent: 'none',
-                    renderWhitespace: 'selection',
-                    tabSize: 2,
-                    insertSpaces: true,
-                    detectIndentation: true,
-                    trimAutoWhitespace: true,
-                    formatOnPaste: true,
-                    formatOnType: true,
-                    guides: {
-                      indentation: true,
-                      highlightActiveIndentation: true,
-                      bracketPairs: true
-                    },
-                    bracketPairColorization: {
-                      enabled: true
-                    },
-                    quickSuggestions: true,
-                    suggestOnTriggerCharacters: true,
-                    acceptSuggestionOnEnter: 'on',
-                    mouseWheelZoom: false,
-                    fixedOverflowWidgets: true
-                  }}
-                />
+                {viewMode === 'table' ? (
+                  <div className="absolute inset-0 overflow-auto bg-[#0F1113] text-[#D0D3D8]">
+                    {tableView.error ? (
+                      <div className="p-4 text-sm text-[#EAB308]">{tableView.error}</div>
+                    ) : tableView.columns.length === 0 ? (
+                      <div className="p-4 text-sm text-[#7A7F86]">No tabular data to display.</div>
+                    ) : (
+                      <table className="text-sm border-collapse">
+                        <thead className="bg-[#111418] sticky top-0 z-10">
+                          <tr>
+                            {tableView.columns.map((col, colIdx) => (
+                              <th key={col || `col-${colIdx}`} className="border border-[#1C1F22] px-3 py-2 text-left font-semibold text-[#9CA3AF] whitespace-nowrap">
+                                {col || 'Column'}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableView.rows.map((row, idx) => (
+                            <tr key={idx} className="odd:bg-[#0F1113] even:bg-[#0C0E12]">
+                              {row.map((cell: string, cIdx: number) => (
+                                <td key={`${idx}-${cIdx}`} className="border border-[#1C1F22] px-3 py-2 text-[#D0D3D8] whitespace-nowrap">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ) : (
+                  <Editor
+                    key={activeFile.id}
+                    height="100%"
+                    language={getLanguage(activeFile.name)}
+                    value={editorContent}
+                    onChange={handleEditorChange}
+                    beforeMount={(monaco) => {
+                      // Define theme before editor mounts to prevent white flash
+                      defineCustomTheme(monaco);
+                    }}
+                    onMount={handleEditorDidMount}
+                    theme="detective-dark"
+                    loading={<div className="flex items-center justify-center h-full bg-[#0F1113] text-[#7A7F86]">Loading editor...</div>}
+                    options={{
+                      fontSize: 14,
+                      fontFamily: "JetBrains Mono, Fira Code, Consolas, monospace",
+                      lineHeight: 21,
+                      letterSpacing: 0,
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      renderLineHighlight: 'line',
+                      cursorStyle: 'line',
+                      cursorBlinking: 'smooth',
+                      cursorSmoothCaretAnimation: 'on',
+                      smoothScrolling: true,
+                      padding: { top: 16, bottom: 16 },
+                      lineNumbers: 'on',
+                      lineNumbersMinChars: 3,
+                      glyphMargin: true,
+                      folding: true,
+                      selectOnLineNumbers: true,
+                      roundedSelection: false,
+                      readOnly: false,
+                      automaticLayout: true,
+                      wordWrap: 'off',
+                      wrappingIndent: 'none',
+                      renderWhitespace: 'selection',
+                      tabSize: 2,
+                      insertSpaces: true,
+                      detectIndentation: true,
+                      trimAutoWhitespace: true,
+                      formatOnPaste: true,
+                      formatOnType: true,
+                      guides: {
+                        indentation: true,
+                        highlightActiveIndentation: true,
+                        bracketPairs: true
+                      },
+                      bracketPairColorization: {
+                        enabled: true
+                      },
+                      quickSuggestions: true,
+                      suggestOnTriggerCharacters: true,
+                      acceptSuggestionOnEnter: 'on',
+                      mouseWheelZoom: false,
+                      fixedOverflowWidgets: true
+                    }}
+                  />
+                )}
               </div>
             </>
           ) : (
@@ -1238,152 +1670,274 @@ const DetectiveD = () => {
 
         {/* Right Panel - Error Details Analysis */}
         <div className="border-l border-[#1C1F22] bg-[#101113] overflow-y-auto">
-          {selectedErrorId && activeFile ? (
+          {(selectedErrorId || selectedStructureIssue) && activeFile ? (
             (() => {
+              // Handle structure issues
+              if (selectedStructureIssue) {
+                return (
+                  <div className="h-full flex flex-col">
+                    <div className="px-4 py-3 border-b border-[#1C1F22]">
+                      <h2 className="text-sm font-semibold text-[#E6E7E9]">Structure Issue Details</h2>
+                    </div>
+                    
+                    <div className="px-4 py-4 space-y-5 overflow-y-auto flex-1">
+                      <div>
+                        <h3 className="text-base font-semibold text-[#E6E7E9] leading-snug">
+                          {selectedStructureIssue.message}
+                        </h3>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                          Location
+                        </div>
+                        <div className="text-sm space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#D0D3D8]">Line <span className="font-mono font-semibold text-[#E6E7E9]">{selectedStructureIssue.line}</span></span>
+                            {selectedStructureIssue.column && (
+                              <>
+                                <span className="text-[#7A7F86]">•</span>
+                                <span className="text-[#D0D3D8]">Column <span className="font-mono font-semibold text-[#E6E7E9]">{selectedStructureIssue.column}</span></span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold border bg-orange-900/30 border-orange-500/30 text-orange-400">
+                          Structure Issue
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                          Why This Matters
+                        </div>
+                        <p className="text-sm text-[#D0D3D8] leading-relaxed">
+                          Structure issues prevent proper data processing and can cause errors when importing or validating your data.
+                          However, you can still run analysis - Detective D will attempt to work with the data despite these issues.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                          How to Fix
+                        </div>
+                        <div className="space-y-3">
+                          <div className="bg-[#0F1113] border border-[#1C1F22] rounded-md p-3">
+                            <div className="text-sm text-[#D0D3D8] leading-relaxed space-y-2">
+                              <div className="font-medium text-orange-300">
+                                📝 Manual Fix Required
+                              </div>
+                              <div>
+                                {selectedStructureIssue.suggestedFix && selectedStructureIssue.suggestedFix !== 'Manual review required' 
+                                  ? selectedStructureIssue.suggestedFix
+                                  : `Review line ${selectedStructureIssue.line} and correct the ${selectedStructureIssue.pattern.toLowerCase().replace('_', ' ')} issue.`
+                                }
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {selectedStructureIssue.evidence && (
+                            <div className="bg-blue-500/5 border border-blue-500/20 rounded-md p-3">
+                              <div className="text-xs font-medium text-blue-400 mb-2">Technical Details</div>
+                              <div className="text-xs text-blue-300 space-y-1">
+                                <div><strong>Context:</strong> {selectedStructureIssue.evidence.context}</div>
+                                <div><strong>Rule Violated:</strong> {selectedStructureIssue.evidence.ruleViolated}</div>
+                                {selectedStructureIssue.evidence.observed && (
+                                  <div><strong>Found:</strong> <code className="bg-blue-500/20 px-1">{selectedStructureIssue.evidence.observed}</code></div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="bg-green-500/5 border border-green-500/20 rounded-md p-3">
+                            <div className="text-xs font-medium text-green-400 mb-1">
+                              💡 Analysis Available
+                            </div>
+                            <div className="text-xs text-green-300">
+                              You can still proceed with data analysis. Click the Analyze button to run Detective D even with structure issues present.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Handle semantic errors
               const selectedError = errors.find(e => e.id === selectedErrorId);
               if (!selectedError) return null;
+
+              const context = getErrorContext(selectedError, editorContent, activeFile.name);
+              const categoryInfo = getCategoryInfo(selectedError.category);
+              const confidenceNum = typeof selectedError.confidence === 'number' ? selectedError.confidence : 95;
+              const confidenceLevel = confidenceNum >= 90 ? 'High' : confidenceNum >= 75 ? 'Medium' : 'Low';
 
               return (
                 <div className="h-full flex flex-col">
                   {/* Header */}
-                  <div className="px-4 py-4 border-b border-[#1C1F22]">
-                    <h2 className="text-sm font-semibold text-[#E6E7E9]">
-                      Error Details
-                    </h2>
+                  <div className="px-4 py-3 border-b border-[#1C1F22]">
+                    <h2 className="text-sm font-semibold text-[#E6E7E9]">Error Details</h2>
                   </div>
 
                   {/* Content */}
-                  <div className="px-4 py-4 overflow-y-auto flex-1">
-                    {/* Error Title Block */}
-                    <div className="error-details-section">
-                      <div className="flex items-start gap-2 mb-2">
-                        <h3 className="text-base font-medium text-[#E6E7E9] flex-1">
-                          {selectedError.message}
-                        </h3>
-                        {selectedError.source === 'ai' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold bg-primary/20 text-primary border border-primary/30">
-                            <Sparkles className="h-3 w-3" />
-                            AI Detected
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                            Local Parser
-                          </span>
-                        )}
+                  <div className="px-4 py-4 space-y-5 overflow-y-auto flex-1">
+                    
+                    {/* 1. What is wrong - Error Title */}
+                    <div>
+                      <h3 className="text-base font-semibold text-[#E6E7E9] leading-snug">
+                        {selectedError.message}
+                      </h3>
+                    </div>
+
+                    {/* 2. Where - Location */}
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                        Location
                       </div>
-                      <div className="text-xs text-[#7A7F86] space-y-1">
-                        <div className="flex flex-wrap items-center gap-x-2">
-                          <span className="text-[#9CA3AF] font-medium">{selectedError.category}</span>
-                          {selectedError.severity && selectedError.source === 'ai' && (
+                      <div className="text-sm space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#D0D3D8]">Line <span className="font-mono font-semibold text-[#E6E7E9]">{selectedError.line}</span></span>
+                          {selectedError.column && (
                             <>
-                              <span>•</span>
-                              <span className={`font-semibold ${
-                                selectedError.severity === 'critical' ? 'text-red-400' :
-                                selectedError.severity === 'high' ? 'text-orange-400' :
-                                selectedError.severity === 'medium' ? 'text-yellow-400' :
-                                'text-blue-400'
-                              }`}>
-                                {selectedError.severity.toUpperCase()}
-                              </span>
+                              <span className="text-[#7A7F86]">•</span>
+                              <span className="text-[#D0D3D8]">Column <span className="font-mono font-semibold text-[#E6E7E9]">{selectedError.column}</span></span>
                             </>
                           )}
-                          <span>•</span>
-                          <span>Line {selectedError.line}</span>
-                          <span>•</span>
-                          <span>Confidence {selectedError.confidence || 85}%</span>
                         </div>
+                        {context && typeof context === 'object' && 'fieldPath' in context && (context as any).fieldPath && (
+                          <div className="text-[#D0D3D8]">
+                            Path: <span className="font-mono text-[#E6E7E9]">{(context as any).fieldPath}</span>
+                          </div>
+                        )}
+
                       </div>
                     </div>
 
-                    {/* Affected Lines (if grouped) */}
-                    {selectedError.occurrences && selectedError.occurrences > 1 && (
-                      <div className="error-details-section">
-                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                          Affected Lines ({selectedError.occurrences})
+                    {/* Category Badge */}
+                    <div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold border ${categoryInfo.color}`}>
+                        {categoryInfo.label}
+                      </span>
+                    </div>
+
+                    {/* Found vs Expected (if we have context) */}
+                    {context && typeof context === 'object' && ('actualValue' in context || 'expectedType' in context) && ((context as any).actualValue || (context as any).expectedType) && (
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                          Value Comparison
+                        </div>
+                        <div className="bg-[#0F1113] border border-[#1C1F22] rounded-md p-3 space-y-2 text-sm">
+                          {(context as any).actualValue && (
+                            <div>
+                              <span className="text-[#7A7F86]">Found:</span>{' '}
+                              <span className="font-mono text-red-400">{(context as any).actualValue}</span>
+                            </div>
+                          )}
+                          {(context as any).expectedType && (
+                            <div>
+                              <span className="text-[#7A7F86]">Expected:</span>{' '}
+                              <span className="font-mono text-green-400">{(context as any).expectedType}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. Why this matters */}
+                    {context && typeof context === 'object' && 'whyMatters' in context && context.whyMatters && (
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                          Why This Matters
                         </div>
                         <p className="text-sm text-[#D0D3D8] leading-relaxed">
-                          This error occurs on {selectedError.occurrences} different lines: {selectedError.affectedLines?.join(', ')}
+                          {context.whyMatters}
                         </p>
                       </div>
                     )}
 
-                    {/* Explanation Section */}
-                    <div className="error-details-section">
-                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                        Explanation
+                    {/* 4. How to fix */}
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                        Suggested Fix
                       </div>
-                      <p className="text-sm text-[#D0D3D8] leading-relaxed">
-                        {selectedError.explanation || (
-                          selectedError.type === 'error' 
-                            ? `A syntax error has been detected at line ${selectedError.line}. This error prevents the file from being parsed correctly. The parser encountered an unexpected token or structure that doesn't conform to the expected format.`
-                            : `A potential issue has been identified at line ${selectedError.line}. While the file may still be valid, this structure could lead to unexpected behavior or parsing issues.`
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Suggested Fixes Section */}
-                    <div className="error-details-section">
-                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                        Suggested Fixes ({(selectedError.suggestions && selectedError.suggestions.length > 0) 
-                          ? selectedError.suggestions.length 
-                          : getSuggestions(selectedError, activeFile.name).length})
-                      </div>
-                      <div className="space-y-2">
-                        {(selectedError.suggestions && selectedError.suggestions.length > 0 
-                          ? selectedError.suggestions 
-                          : getSuggestions(selectedError, activeFile.name)
-                        ).map((suggestion, idx) => (
-                          <div key={idx} className="text-sm text-[#D0D3D8]">
-                            <span className="text-[#7A7F86]">•</span>
-                            <span className="ml-2">{suggestion}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Affected Area Section */}
-                    <div className="error-details-section">
-                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                        Affected Area
-                      </div>
-                      <div className="text-sm text-[#D0D3D8] bg-[#0F1113] rounded px-3 py-2 font-mono">
-                        {selectedError.occurrences && selectedError.occurrences > 1 
-                          ? `Lines: ${selectedError.affectedLines?.join(', ')}`
-                          : `Line ${selectedError.line}`
-                        }
-                      </div>
-                    </div>
-
-                    {/* Confidence Breakdown */}
-                    <div className="error-details-section">
-                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide mb-2">
-                        Detection Confidence
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-[#0F1113] rounded-full h-2 overflow-hidden">
-                            <div 
-                              className={`h-full transition-all ${
-                                (selectedError.confidence || 85) >= 90 ? 'bg-green-500' :
-                                (selectedError.confidence || 85) >= 75 ? 'bg-blue-500' :
-                                (selectedError.confidence || 85) >= 60 ? 'bg-yellow-500' :
-                                'bg-orange-500'
-                              }`}
-                              style={{ width: `${selectedError.confidence || 85}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-semibold text-[#E6E7E9] min-w-[45px]">
-                            {selectedError.confidence || 85}%
-                          </span>
-                        </div>
+                      <div className="bg-[#0F1113] border border-[#1C1F22] rounded-md p-3">
                         <p className="text-sm text-[#D0D3D8] leading-relaxed">
-                          {selectedError.source === 'ai' 
-                            ? `AI analysis confidence based on semantic understanding, pattern recognition, and best practices validation.`
-                            : `Local parser detection based on syntax rules and format specifications. ${selectedError.confidence && selectedError.confidence >= 95 ? 'High confidence indicates a definite syntax violation.' : ''}`
-                          }
+                          {selectedError.suggestions && selectedError.suggestions.length > 0
+                            ? selectedError.suggestions[0]
+                            : (context && typeof context === 'object' && 'suggestion' in context ? context.suggestion : '')}
                         </p>
                       </div>
                     </div>
+
+                    {/* Confidence Indicator */}
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
+                        Confidence
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-[#0F1113] rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className={`h-full transition-all ${
+                              confidenceNum >= 90 ? 'bg-green-500' :
+                              confidenceNum >= 75 ? 'bg-blue-500' :
+                              'bg-yellow-500'
+                            }`}
+                            style={{ width: `${confidenceNum}%` }}
+                          />
+                        </div>
+                        <span className={`text-sm font-semibold min-w-[55px] ${
+                          confidenceNum >= 90 ? 'text-green-400' :
+                          confidenceNum >= 75 ? 'text-blue-400' :
+                          'text-yellow-400'
+                        }`}>
+                          {confidenceLevel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (editorRef.current) {
+                            editorRef.current.revealLineInCenter(selectedError.line);
+                            editorRef.current.setPosition({ 
+                              lineNumber: selectedError.line, 
+                              column: selectedError.column || 1 
+                            });
+                            editorRef.current.focus();
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-primary hover:bg-primary/80 text-white text-sm font-medium rounded transition-colors"
+                      >
+                        Go to Line
+                      </button>
+                      <button
+                        onClick={() => {
+                          const fixText = selectedError.suggestions && selectedError.suggestions.length > 0
+                            ? selectedError.suggestions[0]
+                            : (context && typeof context === 'object' && 'suggestion' in context ? (context as any).suggestion : '');
+                          navigator.clipboard.writeText(fixText);
+                          toast.success("Fix suggestion copied to clipboard");
+                        }}
+                        className="flex-1 px-3 py-2 bg-[#1C1F22] hover:bg-[#24272B] text-[#E6E7E9] text-sm font-medium rounded transition-colors"
+                      >
+                        Copy Fix
+                      </button>
+                    </div>
+
+                    {/* Detection Source Badge */}
+                    <div className="pt-2 border-t border-[#1C1F22]">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                        <Zap className="h-3 w-3" />
+                        Deterministic
+                      </span>
+                    </div>
+
                   </div>
                 </div>
               );

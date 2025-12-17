@@ -1,0 +1,43 @@
+[
+  {
+    "id": 1,
+    "activity": "Debugging Code",
+    "timePercent": null,
+    "description": "Missing percentage should be flagged",
+    "startDate": "2025-01-05",
+    "endDate": "2025-01-04"
+  },
+  {
+    "id": 1,
+    "activity": "Writing New Code",
+    "timePercent": 999999,
+    "description": "Extreme outlier value",
+    "startDate": "2025-02-01",
+    "endDate": "2025-02-10"
+  },
+  {
+    "id": 3,
+    "activity": "Other Activities",
+    "timePercent": "30",
+    "description": "Numeric value stored as string",
+    "startDate": "12/31/2025",
+    "endDate": "01/02/2026"
+  },
+  {
+    "id": 4,
+    "activity": "Deployment",
+    "timePercent": -5,
+    "description": "Unexpected negative percentage",
+    "startDate": "1899-12-31",
+    "endDate": "2026-12-31",
+    "status": ""
+  },
+  {
+    "id": 5,
+    "activity": "Refactoring",
+    "timePercent": 30,
+    "description": "Placeholder value present",
+    "notes": "N/A",
+    "flag": "true"
+  }
+]

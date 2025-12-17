@@ -1,0 +1,27 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "age": "25",
+      "email": "john@example.com"
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "age": -5,
+      "email": "invalid-email"
+    },
+    {
+      "id": 3,
+      "name": "Bob Wilson",
+      "age": 150,
+      "email": "bob@example.com",
+      "score": 150
+    }
+  ],
+  "metadata": {
+    "total": 5,
+    "active": 3
+  }
+}
