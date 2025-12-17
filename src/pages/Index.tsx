@@ -77,7 +77,7 @@ const Index = () => {
   }, []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="light">
       <div className="min-h-screen bg-background overflow-x-hidden max-w-[100vw] pt-[64px]">
         <Header />
           <NotificationModal open={notificationModalOpen} onOpenChange={setNotificationModalOpen} />
