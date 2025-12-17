@@ -1126,28 +1126,30 @@ const DetectiveD = () => {
 
             {/* Reset/Clear Button */}
             
-            {/* Analyze Data Button */}
-            <Button
-              onClick={runAnalysis}
-              disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-4 py-2 font-medium"
-              title={hasStructureErrors 
-                ? "Analyze data (will attempt analysis despite structural issues)" 
-                : "Run comprehensive data analysis with Detective D"}
-            >
-              {isAnalyzing ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs font-medium">Analyzing...</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4" />
-                  <span className="text-xs font-medium">Analyze Data</span>
-                </>
-              )}
-            </Button>
+            {/* Analyze Data Button - show only when a file is active */}
+            {activeFile && (
+              <Button
+                onClick={runAnalysis}
+                disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-4 py-2 font-medium"
+                title={hasStructureErrors 
+                  ? "Analyze data (will attempt analysis despite structural issues)" 
+                  : "Run comprehensive data analysis with Detective D"}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-medium">Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4" />
+                    <span className="text-xs font-medium">Analyze Data</span>
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Reset/Clear Button */}
             <Button
@@ -1255,7 +1257,7 @@ const DetectiveD = () => {
                 <div className="text-xs text-[#7A7F86]">Detective D is scanning for issues</div>
               </div>
             </div>
-          ) : (structureIssues.length > 0 || errors.length > 0) ? (
+          ) : (activeFile && (structureIssues.length > 0 || errors.length > 0)) ? (
             <div className="py-1">
               {/* Info Banner */}
               <div className="px-3 py-2.5 bg-[#1A1D20] border-b border-[#1C1F22]">
@@ -1443,6 +1445,30 @@ const DetectiveD = () => {
                   <div>✓ No buttons needed - it just works!</div>
                 </div>
               </div>
+            </div>
+          ) : activeFile ? (
+            <div className="px-3 py-8 text-center space-y-3">
+              <div className="flex justify-center mb-3">
+                <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-sm font-semibold text-[#E6E7E9]">✓ No issues found</div>
+              <div className="text-xs text-[#7A7F86]">Your data looks clean and valid!</div>
+              <div className="pt-4 border-t border-[#1C1F22]">
+                <div className="text-xs text-[#5A5F66] font-semibold mb-2">💡 Automatic Analysis:</div>
+                <div className="text-xs text-[#5A5F66] leading-relaxed space-y-1">
+                  <div>✓ Analysis runs automatically on upload</div>
+                  <div>✓ Real-time scanning as you edit</div>
+                  <div>✓ No buttons needed - it just works!</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="px-4 py-8 text-center text-sm text-[#9CA0A6]">
+              No file uploaded yet. Upload or paste a file to run structure validation and analysis.
             </div>
           )}
         </div>
