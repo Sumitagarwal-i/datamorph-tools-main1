@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { 
   ChevronLeft, 
-  ChevronRight,
-  Bell
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +17,14 @@ interface SlideData {
 }
 
 export function DetectiveDBanner() {
+  const navigate = useNavigate();
   const slides: SlideData[] = [
     {
       id: 0,
-      headline: "Detective D just around the corner",
+      headline: "Detective D Beta is Live!",
       subtext: "Your AI agent for deep error detection and anomaly repair.",
       image: "/b1.webp",
-      cta: "Get Notified"
+      cta: "Try Beta Now"
     },
     {
       id: 1,
@@ -89,13 +90,10 @@ export function DetectiveDBanner() {
                 {slides[currentSlide].cta ? (
                   <div className="pt-1">
                     <button
-                      onClick={() => window.dispatchEvent(new CustomEvent('openNotificationModal'))}
-                      aria-label="Get notified for Detective D"
+                      onClick={() => navigate('/detective-d')}
+                      aria-label="Try Detective D Beta"
                       className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-full shadow-sm px-3 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
-                      <span className="flex items-center justify-center h-4 w-4">
-                        <Bell className="h-3.5 w-3.5" />
-                      </span>
                       <span className="whitespace-nowrap">{slides[currentSlide].cta}</span>
                     </button>
                   </div>

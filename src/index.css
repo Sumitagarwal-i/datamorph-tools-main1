@@ -189,6 +189,16 @@ All colors MUST be HSL.
     position: relative;
   }
 
+  /* Ensure the app fills the full viewport and no white gutter appears at the right edge. */
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    background-color: #0d0f13 !important;
+    overflow-x: hidden;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Work Sans', var(--font-sans);
     letter-spacing: -0.02em;
@@ -271,6 +281,19 @@ All colors MUST be HSL.
   .warning-line-highlight {
     background: rgba(255, 200, 0, 0.07) !important;
     border-right: 2px solid #EAB308 !important;
+  }
+
+  /* Precise range highlighting for character offsets */
+  .error-range-highlight {
+    background: rgba(255, 77, 77, 0.25) !important;
+    border: 1px solid #FF4D4D !important;
+    border-radius: 2px !important;
+  }
+
+  .warning-range-highlight {
+    background: rgba(234, 179, 8, 0.20) !important;
+    border: 1px solid #EAB308 !important;
+    border-radius: 2px !important;
   }
 
   .error-line-glyph {
@@ -390,6 +413,22 @@ All colors MUST be HSL.
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }
+
+  /* Strong override to ensure Detective D covers the full viewport without any edge gutters */
+  .detective-d-slide-in {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background-color: #0d0f13 !important;
+    overflow-x: hidden !important;
+  }
 }
 
 /* Enhanced button styles with rounded corners */
@@ -414,4 +453,34 @@ All colors MUST be HSL.
   select {
     border-radius: 1rem;
   }
+}
+
+/* Right panel scrollbar - dark themed to match Detective D */
+.right-panel {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(255,255,255,0.12) transparent; /* Firefox thumb and track */
+}
+
+.right-panel::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.right-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.right-panel::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0);
+}
+
+.right-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+/* Ensure inner scrollable elements inherit a matching thumb color */
+.right-panel *::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
 }

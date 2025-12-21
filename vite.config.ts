@@ -25,36 +25,67 @@ export default defineConfig(({ mode }) => ({
     minify: "terser",
     cssCodeSplit: true,
     sourcemap: false,
+    reportCompressedSize: true,
     terserOptions: {
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ["console.log", "console.info"],
-        passes: 2,
+        pure_funcs: ["console.log", "console.info", "console.warn"],
+        passes: 3,
+        toplevel: true,
       },
       mangle: {
         safari10: true,
+        properties: {
+          regex: /^_/
+        }
       },
+      format: {
+        comments: false,
+      }
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom"],
-          ui: ["@radix-ui/react-dialog", "@radix-ui/react-tabs", "@radix-ui/react-toast", "@radix-ui/react-dropdown-menu"],
-          parser: ["papaparse"],
-          monaco: ["@monaco-editor/react"],
-          query: ["@tanstack/react-query"],
+        manualChunks: (id) => {
+          // Vendor chunk for core dependencies
+          if (id.includes('node_modules')) {
+            if (id.includes('@monaco-editor')) return 'monaco';
+            if (id.includes('@radix-ui')) return 'radix-ui';
+            if (id.includes('react') || id.includes('react-dom')) return 'react';
+            if (id.includes('react-router-dom')) return 'router';
+            if (id.includes('@tanstack/react-query')) return 'react-query';
+            if (id.includes('papaparse')) return 'csv-parser';
+            if (id.includes('@supabase')) return 'supabase';
+            if (id.includes('sonner') || id.includes('next-themes')) return 'ui-libs';
+            return 'vendor';
+          }
+          // App chunks
+          if (id.includes('src/pages')) return 'pages';
+          if (id.includes('src/components') && !id.includes('ui/')) return 'components';
+          if (id.includes('src/lib')) return 'lib';
         },
-        chunkFileNames: "assets/[name]-[hash].js",
-        entryFileNames: "assets/[name]-[hash].js",
-        assetFileNames: "assets/[name]-[hash].[ext]",
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        inlineDynamicImports: false,
       },
     },
-    chunkSizeWarningLimit: 1000,
-    reportCompressedSize: true,
+    chunkSizeWarningLimit: 750,
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "papaparse", "@tanstack/react-query"],
+    include: [
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "papaparse",
+      "@tanstack/react-query",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-dropdown-menu",
+      "sonner",
+      "next-themes"
+    ],
     exclude: ["@monaco-editor/react"],
   },
 }));

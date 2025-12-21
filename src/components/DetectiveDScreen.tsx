@@ -63,8 +63,12 @@ export const DetectiveDScreen = ({ isOpen, onClose }: DetectiveDScreenProps) => 
           </div>
 
           {/* Main content placeholder */}
-          <div className="flex items-center justify-center h-[calc(100%-120px)] text-muted-foreground">
-            <p className="text-center">Detective D Coming Soon...</p>
+          <div className="flex flex-col items-center justify-center h-[calc(100%-120px)]">
+            <div className="text-base font-semibold text-foreground mb-1">No file uploaded</div>
+            <div className="text-sm text-muted-foreground mb-0.5" style={{ lineHeight: 1.7, maxWidth: 320, textAlign: 'center' }}>
+              Upload or paste a file to run<br />
+              structure validation and analysis.
+            </div>
           </div>
         </div>
       </div>

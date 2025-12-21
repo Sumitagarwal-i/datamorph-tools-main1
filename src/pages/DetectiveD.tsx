@@ -1,5 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Table, AlignLeft, Zap, ExternalLink } from "lucide-react";
+import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Check, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Table, AlignLeft, Zap, ExternalLink, FileDown, Share2, Shield, Bell, MessageSquare, AlertCircle, Info } from "lucide-react";
+import { HelpCenterModal } from "@/components/HelpCenterModal";
+import { DetectiveDExplainerModal } from "@/components/DetectiveDExplainerModal";
+import { ShareModal } from "@/components/ShareModal";
+import { AuditLogModal } from "@/components/AuditLogModal";
+import { ExportModal } from "@/components/ExportModal";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -10,6 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
 import { DetectiveD as DetectiveDEngine, DetectiveFinding } from "@/lib/detectiveD";
 import { StructureValidator, StructureIssue, StructureValidationResult } from "@/lib/structureValidator";
@@ -29,8 +40,13 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 // ============================================================================
 interface ErrorItem {
   id: string;
+  /** Display line number (derived from offset) */
   line: number;
+  /** Display column number (derived from offset) */
   column?: number;
+  /** Character offset range for precise highlighting */
+  startOffset?: number;
+  endOffset?: number;
   type: 'error' | 'warning';
   message: string;
   category?: string;
@@ -119,18 +135,38 @@ const DetectiveD = () => {
   const [structureIssues, setStructureIssues] = useState<StructureIssue[]>([]);
   const [hasStructureErrors, setHasStructureErrors] = useState(false);
   const [isFixingStructure, setIsFixingStructure] = useState(false);
+  const [showFileLimitModal, setShowFileLimitModal] = useState(false);
   const [isRealTimeValidating, setIsRealTimeValidating] = useState(false);
   const [validationTimeoutId, setValidationTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
+  const [helpCenterOpen, setHelpCenterOpen] = useState(false);
+  const [showExplainerModal, setShowExplainerModal] = useState(true);
+  
+  // Edit mode: track if user is editing after analysis (shows cancel/confirm buttons)
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [originalContent, setOriginalContent] = useState<string>("");
+  const [hasAnalyzedOnce, setHasAnalyzedOnce] = useState(false);
+  
+  // Modal open/close state
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [stayConnectedModalOpen, setStayConnectedModalOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackEmail, setFeedbackEmail] = useState("");
+  const [feedbackOptIn, setFeedbackOptIn] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [stayConnectedEmail, setStayConnectedEmail] = useState("");
+  const [stayConnectedOptIn, setStayConnectedOptIn] = useState(false);
+  
+  // Store errors and structure issues per file ID for persistence
+  const fileErrorsRef = useRef<Map<string, ErrorItem[]>>(new Map());
+  const fileStructureIssuesRef = useRef<Map<string, StructureIssue[]>>(new Map());
+  const fileAnalyzedRef = useRef<Map<string, boolean>>(new Map());
+  const fileOriginalContentRef = useRef<Map<string, string>>(new Map());
 
-  // Check authentication on mount
-  useEffect(() => {
-    const isAuthenticated = sessionStorage.getItem("detective_d_auth");
-    if (!isAuthenticated) {
-      toast.error("Access denied. Please enter the developer passcode.");
-      navigate("/");
-    }
-  }, [navigate]);
+  // Detective D is now public - no passcode required
 
   const handleFileUpload = () => {
     fileInputRef.current?.click();
@@ -168,6 +204,13 @@ const DetectiveD = () => {
           name: file.name,
           content: content
         };
+        
+        // Limit to maximum 2 open files
+        if (uploadedFiles.length >= 2) {
+          setShowFileLimitModal(true);
+          return;
+        }
+        
         setUploadedFiles(prev => [...prev, newFile]);
         setActiveFileId(newFile.id);
         
@@ -221,6 +264,26 @@ const DetectiveD = () => {
   useEffect(() => {
     if (activeFile) {
       setEditorContent(activeFile.content);
+      setSelectedErrorId(null);
+      setSelectedStructureIssue(null);
+      
+      // Restore errors and structure issues for this file (complete isolation)
+      const savedErrors = fileErrorsRef.current.get(activeFile.id) || [];
+      const savedStructureIssues = fileStructureIssuesRef.current.get(activeFile.id) || [];
+      const wasAnalyzed = fileAnalyzedRef.current.get(activeFile.id) || false;
+      const savedOriginalContent = fileOriginalContentRef.current.get(activeFile.id) || activeFile.content;
+      
+      setErrors(savedErrors);
+      setStructureIssues(savedStructureIssues);
+      setHasStructureErrors(savedStructureIssues.length > 0 && savedStructureIssues.some(i => i.type === 'error'));
+      setHasAnalyzedOnce(wasAnalyzed);
+      setOriginalContent(savedOriginalContent);
+      setIsEditMode(false); // Reset edit mode when switching files
+      
+      // Only re-validate if no saved issues exist
+      if (savedStructureIssues.length === 0) {
+        validateFileStructure(activeFile.content, activeFile.name);
+      }
     }
   }, [activeFile]);
 
@@ -242,6 +305,35 @@ const DetectiveD = () => {
       return;
     }
 
+    // Re-validate structure using CURRENT editor content before analysis
+    const extension = activeFile.name.split('.').pop()?.toLowerCase();
+    let fileType: 'json' | 'csv' | 'xml' | 'yaml';
+    switch (extension) {
+      case 'json': fileType = 'json'; break;
+      case 'csv': fileType = 'csv'; break;
+      case 'xml': fileType = 'xml'; break;
+      case 'yaml':
+      case 'yml': fileType = 'yaml'; break;
+      default: fileType = 'json';
+    }
+    
+    const validator = new StructureValidator(editorContent, fileType);
+    const structureResult = validator.validate();
+    
+    // Update structure issues with current validation
+    setStructureIssues(structureResult.issues);
+    fileStructureIssuesRef.current.set(activeFile.id, structureResult.issues);
+    setHasStructureErrors(!structureResult.isValid);
+    
+    // Prevent analysis if structural issues exist in CURRENT content
+    if (!structureResult.isValid && structureResult.issues.length > 0) {
+      toast.error('Analysis blocked', {
+        description: 'Please fix structural issues before running analysis. Structure errors must be resolved first.',
+        duration: 5000
+      });
+      return;
+    }
+
     try {
       setIsAnalyzing(true);
       
@@ -252,8 +344,10 @@ const DetectiveD = () => {
       // Convert findings to ErrorItem for display
       const displayItems: ErrorItem[] = findings.map(finding => ({
         id: finding.id,
-        line: finding.location.row || 1, // Detective D already provides correct line numbers
+        line: finding.location.row || 1, // Display line number (derived from offset)
         column: finding.location.column ? Number(finding.location.column) : undefined,
+        startOffset: finding.location.startOffset, // Primary reference for highlighting
+        endOffset: finding.location.endOffset,
         type: finding.severity === 'error' ? 'error' : 'warning',
         message: finding.summary,
         category: finding.category,
@@ -270,6 +364,14 @@ const DetectiveD = () => {
       }));
       
       setErrors(displayItems);
+      if (activeFile) {
+        fileErrorsRef.current.set(activeFile.id, displayItems);
+        fileAnalyzedRef.current.set(activeFile.id, true);
+        fileOriginalContentRef.current.set(activeFile.id, editorContent);
+      }
+      setHasAnalyzedOnce(true);
+      setOriginalContent(editorContent);
+      setIsEditMode(false); // Clear edit mode after successful analysis
       setLastValidationTime(Date.now());
       
       // Show feedback toast
@@ -343,6 +445,9 @@ const DetectiveD = () => {
       });
       
       setStructureIssues(result.issues);
+      if (activeFile) {
+        fileStructureIssuesRef.current.set(activeFile.id, result.issues);
+      }
       setHasStructureErrors(!result.isValid);
       
       if (!result.isValid) {
@@ -428,11 +533,38 @@ const DetectiveD = () => {
         const validator = new StructureValidator(content, fileType);
         const result = validator.validate();
         
+        console.log('Real-time validation result:', {
+          fileName,
+          contentLength: content.length,
+          isValid: result.isValid,
+          issueCount: result.issues.length,
+          issues: result.issues.map(i => ({ id: i.id, line: i.line, column: i.column, message: i.message })),
+          previousIssueCount: structureIssues.length
+        });
+        
         setStructureIssues(result.issues);
         setHasStructureErrors(!result.isValid);
         
         // Update the file content in state to match editor
         if (activeFile) {
+          // Save structure issues to the Map for this file
+          fileStructureIssuesRef.current.set(activeFile.id, result.issues);
+          
+          // CRITICAL: If structure is now valid, clear ALL old state completely
+          if (result.isValid && result.issues.length === 0) {
+            console.log('Structure is now valid - clearing all old errors');
+            setErrors([]);
+            fileErrorsRef.current.set(activeFile.id, []);
+            setSelectedErrorId(null);
+            setSelectedStructureIssue(null);
+            
+            // Also clear any stale structure issue selections
+            if (selectedStructureIssue) {
+              setSelectedStructureIssue(null);
+            }
+          }
+          
+          // Update file content
           setUploadedFiles(prev => prev.map(f => 
             f.id === activeFile.id 
               ? { ...f, content }
@@ -451,10 +583,17 @@ const DetectiveD = () => {
 
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
+      // Let Monaco Editor handle cursor position naturally during content updates
+      // Do NOT override the cursor position - Monaco will maintain it correctly
       setEditorContent(value);
       
-      // Run real-time structure validation
-      if (activeFile) {
+      // If user has analyzed once and starts editing, enter edit mode (pause real-time validation)
+      if (hasAnalyzedOnce && value !== originalContent && !isEditMode) {
+        setIsEditMode(true);
+      }
+      
+      // Only run real-time validation if NOT in edit mode (i.e., before first analysis)
+      if (!isEditMode && !hasAnalyzedOnce && activeFile) {
         debouncedValidateStructure(value, activeFile.name);
       }
     }
@@ -468,6 +607,67 @@ const DetectiveD = () => {
       }
     };
   }, [validationTimeoutId]);
+
+  // Handle edit confirmation: validate structure → auto-analyze if valid
+  const handleConfirmEdit = async () => {
+    if (!activeFile) return;
+    
+    setIsEditMode(false);
+    
+    // First, run structure validation on the edited content
+    const extension = activeFile.name.split('.').pop()?.toLowerCase();
+    let fileType: 'json' | 'csv' | 'xml' | 'yaml';
+    switch (extension) {
+      case 'json': fileType = 'json'; break;
+      case 'csv': fileType = 'csv'; break;
+      case 'xml': fileType = 'xml'; break;
+      case 'yaml':
+      case 'yml': fileType = 'yaml'; break;
+      default: fileType = 'json';
+    }
+    
+    const validator = new StructureValidator(editorContent, fileType);
+    const structureResult = validator.validate();
+    
+    setStructureIssues(structureResult.issues);
+    fileStructureIssuesRef.current.set(activeFile.id, structureResult.issues);
+    setHasStructureErrors(!structureResult.isValid);
+    
+    if (!structureResult.isValid && structureResult.issues.length > 0) {
+      toast.error('Structural issues found', {
+        description: 'Please fix structural errors before analysis can proceed.',
+        duration: 4000
+      });
+      return;
+    }
+    
+    // Structure is valid → auto-run Detective D analysis
+    toast.success('Changes confirmed', {
+      description: 'Running analysis on updated content...',
+      duration: 2000
+    });
+    
+    // Automatically trigger analysis (no button click needed)
+    await runAnalysis();
+  };
+
+  // Handle edit cancellation: revert to original content
+  const handleCancelEdit = () => {
+    setEditorContent(originalContent);
+    setIsEditMode(false);
+    
+    // Restore content in the file object
+    if (activeFile) {
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === activeFile.id ? { ...f, content: originalContent } : f
+      ));
+    }
+    
+    toast.info('Changes cancelled', {
+      description: 'Reverted to analyzed content',
+      duration: 2000
+    });
+  };
 
   // Generate contextual suggestions based on error
   // Extract error context from content for detailed analysis
@@ -960,7 +1160,7 @@ const DetectiveD = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Apply error highlights to editor with enhanced decorations
+  // Apply error highlights to editor using character offsets for precise highlighting
   const applyErrorHighlights = () => {
     if (!editorRef.current || !monacoRef.current) return;
 
@@ -972,31 +1172,68 @@ const DetectiveD = () => {
       decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
     }
 
-    // Create new decorations for each error
-    const newDecorations = errors.map((error) => {
-      const isError = error.type === 'error';
-      const isWarning = error.type === 'warning';
+    // Create new decorations for each error using precise offset ranges
+    const newDecorations = errors
+      .filter(error => error.startOffset !== undefined && error.endOffset !== undefined)
+      .map((error) => {
+        const isError = error.type === 'error';
+        
+        // Convert character offsets to Monaco editor positions
+        const startPosition = editor.getModel()?.getPositionAt(error.startOffset || 0) || { lineNumber: error.line, column: 1 };
+        const endPosition = editor.getModel()?.getPositionAt(error.endOffset || error.startOffset || 0) || { lineNumber: error.line, column: 2 };
 
-      return {
-        range: new monaco.Range(error.line, 1, error.line, 1),
-        options: {
-          isWholeLine: true,
-          className: isError ? 'error-line-highlight' : 'warning-line-highlight',
-          glyphMarginClassName: isError ? 'error-line-glyph' : 'warning-line-glyph',
-          minimap: {
-            color: isError ? '#FF4D4D' : '#EAB308',
-            position: monaco.editor.MinimapPosition.Inline
-          },
-          overviewRuler: {
-            color: isError ? '#FF4D4D' : '#EAB308',
-            position: monaco.editor.OverviewRulerLane.Full
+        // Ensure we have a valid range (minimum 1 character)
+        const range = new monaco.Range(
+          startPosition.lineNumber,
+          startPosition.column,
+          endPosition.lineNumber,
+          Math.max(endPosition.column, startPosition.column + 1)
+        );
+
+        return {
+          range,
+          options: {
+            className: isError ? 'error-line-highlight' : 'warning-line-highlight',
+            glyphMarginClassName: isError ? 'error-line-glyph' : 'warning-line-glyph',
+            minimap: {
+              color: isError ? '#FF4D4D' : '#EAB308',
+              position: monaco.editor.MinimapPosition.Inline
+            },
+            overviewRuler: {
+              color: isError ? '#FF4D4D' : '#EAB308',
+              position: monaco.editor.OverviewRulerLane.Full
+            },
+            inlineClassName: isError ? 'error-range-highlight' : 'warning-range-highlight'
           }
-        }
-      };
-    });
+        };
+      });
 
-    // Apply decorations with line numbers
-    decorationsRef.current = editor.deltaDecorations([], newDecorations);
+    // Fallback decorations for errors without offset information (use whole line)
+    const fallbackDecorations = errors
+      .filter(error => error.startOffset === undefined || error.endOffset === undefined)
+      .map((error) => {
+        const isError = error.type === 'error';
+        
+        return {
+          range: new monaco.Range(error.line, 1, error.line, 1),
+          options: {
+            isWholeLine: true,
+            className: isError ? 'error-line-highlight' : 'warning-line-highlight',
+            glyphMarginClassName: isError ? 'error-line-glyph' : 'warning-line-glyph',
+            minimap: {
+              color: isError ? '#FF4D4D' : '#EAB308',
+              position: monaco.editor.MinimapPosition.Inline
+            },
+            overviewRuler: {
+              color: isError ? '#FF4D4D' : '#EAB308',
+              position: monaco.editor.OverviewRulerLane.Full
+            }
+          }
+        };
+      });
+
+    // Apply all decorations (precise + fallback)
+    decorationsRef.current = editor.deltaDecorations([], [...newDecorations, ...fallbackDecorations]);
   };
 
   // Handle Monaco Editor mount
@@ -1025,6 +1262,24 @@ const DetectiveD = () => {
         editor.setPosition({ lineNumber: selectedError.line, column: 1 });
       }
     }
+
+    // --- Instrumentation: log cursor and selection events to help debug cursor jumps ---
+    try {
+      editor.onDidChangeCursorPosition((e: any) => {
+        console.debug('[DetectiveD] Cursor position changed', e.position);
+      });
+
+      editor.onDidChangeCursorSelection((e: any) => {
+        console.debug('[DetectiveD] Cursor selection changed', e.selection);
+      });
+
+      editor.onDidChangeModelContent((e: any) => {
+        console.debug('[DetectiveD] Model content changed', { isFlush: e.isFlush, changes: e.changes?.length });
+      });
+    } catch (err) {
+      // Non-fatal - instrumentation optional
+      console.warn('[DetectiveD] Failed to attach editor instrumentation', err);
+    }
   };
 
   // Apply highlights when errors change
@@ -1039,19 +1294,49 @@ const DetectiveD = () => {
     setViewMode('text');
   }, [activeFileId]);
 
-  // Scroll to error line when error is selected
+  // Scroll to error with precise positioning when error is selected
   useEffect(() => {
     if (editorRef.current && selectedErrorId) {
       const selectedError = errors.find(e => e.id === selectedErrorId);
       if (selectedError) {
-        editorRef.current.revealLineInCenter(selectedError.line);
-        editorRef.current.setPosition({ lineNumber: selectedError.line, column: 1 });
+        const editor = editorRef.current;
+        
+        // Use precise offset positioning if available
+        if (selectedError.startOffset !== undefined) {
+          try {
+            const position = editor.getModel()?.getPositionAt(selectedError.startOffset);
+            if (position) {
+              editor.revealPositionInCenter(position);
+              editor.setPosition(position);
+              
+              // Select the error range if end offset is also available
+              if (selectedError.endOffset !== undefined) {
+                const endPosition = editor.getModel()?.getPositionAt(selectedError.endOffset);
+                if (endPosition) {
+                  editor.setSelection({
+                    startLineNumber: position.lineNumber,
+                    startColumn: position.column,
+                    endLineNumber: endPosition.lineNumber,
+                    endColumn: endPosition.column
+                  });
+                }
+              }
+              return;
+            }
+          } catch (error) {
+            console.warn('Failed to use offset positioning, falling back to line positioning:', error);
+          }
+        }
+        
+        // Fallback to line-based positioning
+        editor.revealLineInCenter(selectedError.line);
+        editor.setPosition({ lineNumber: selectedError.line, column: selectedError.column || 1 });
       }
     }
   }, [selectedErrorId]);
 
   return (
-    <div className="min-h-screen h-screen bg-[#0d0f13] text-slate-200 flex flex-col overflow-hidden detective-d-slide-in">
+    <div className="fixed inset-0 bg-[#0d0f13] text-slate-200 flex flex-col overflow-hidden detective-d-slide-in">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -1070,7 +1355,7 @@ const DetectiveD = () => {
               <img src="/Logo.png" alt="DatumInt Logo" className="h-6 w-6" />
             </Link>
             <span className="mx-1 text-slate-600 text-lg font-bold select-none">/</span>
-            {/* Detective D Logo */}
+            {/* Detective D Logo with Beta Badge and Version */}
             <div className="flex items-center gap-2">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-100">
                 {/* Magnifying glass with circuit pattern - real-world tool meets digital analysis */}
@@ -1082,23 +1367,111 @@ const DetectiveD = () => {
                 <circle cx="8" cy="13" r="0.8" fill="currentColor"/>
                 <circle cx="13" cy="13" r="0.8" fill="currentColor"/>
               </svg>
-              <h1 className="text-base font-semibold text-slate-100">Detective D</h1>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base font-semibold text-slate-100 flex items-center gap-2">
+                    Detective D
+                    <span className="ml-1 text-xs text-slate-400 font-normal flex items-center">
+                      v0.1
+                        <span className="text-xs text-slate-400 ml-0.5">(Beta)</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="ml-1 p-0.5 rounded text-slate-400 hover:text-slate-200 transition-colors" aria-label="Beta info">
+                              <Info className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            <p className="max-w-xs">Detective D is in Beta. While it detects most structural and logical issues accurately, some edge cases or complex scenarios may be missed or misinterpreted. We're actively improving its logic and accuracy.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                    </span>
+                  </h1>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Right Side - Utility Buttons */}
           <div className="flex items-center gap-2">
+            {/* Edit Mode: Cancel and Confirm buttons */}
+            {activeFile && isEditMode && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleCancelEdit}
+                      size="sm"
+                      variant="ghost"
+                      className="gap-2 text-red-500 hover:text-red-600 hover:bg-transparent bg-transparent border-0 shadow-none transition-colors px-3 py-2 font-medium"
+                    >
+                      <X className="h-4 w-4" />
+                      <span className="text-xs font-medium">Cancel</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Cancel changes and revert to analyzed content</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleConfirmEdit}
+                      size="sm"
+                      variant="ghost"
+                      className="gap-2 text-green-500 hover:text-green-600 hover:bg-transparent bg-transparent border-0 shadow-none transition-colors px-3 py-2 font-medium"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span className="text-xs font-medium">Confirm</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Confirm changes and re-analyze automatically</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+
+            {/* Normal Mode: Analyze Data Button - show when not in edit mode */}
+            {activeFile && !isEditMode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={runAnalysis}
+                    disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
+                    size="sm"
+                    className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all px-4 py-2 font-medium"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-medium">Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs font-medium">Analyze</span>
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {hasStructureErrors 
+                    ? "Analyze data (will attempt analysis despite structural issues)" 
+                    : "Run comprehensive data analysis with Detective D"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Upload File Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleFileUpload}
-              className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 gap-1 px-2"
-              title="Upload File"
-            >
-              <Upload className="h-4 w-4" />
-              <span className="text-xs font-medium">Upload</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleFileUpload}
+                  className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 gap-1 px-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="text-xs font-medium">Upload</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Upload File</TooltipContent>
+            </Tooltip>
 
             {/* Real-time Analysis Status */}
             {activeFile && isAnalyzing && (
@@ -1116,85 +1489,69 @@ const DetectiveD = () => {
               </div>
             )}
 
-            {/* Structure Status Indicator */}
-            {activeFile && !isRealTimeValidating && structureIssues.length === 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-300 bg-green-900/20 border border-green-500/30 rounded-md">
-                <div className="h-2 w-2 rounded-full bg-green-400"></div>
-                <span>Structure OK</span>
-              </div>
-            )}
+            {/* Structure Status Indicator moved to footer */}
 
             {/* Reset/Clear Button */}
             
-            {/* Analyze Data Button - show only when a file is active */}
-            {activeFile && (
-              <Button
-                onClick={runAnalysis}
-                disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-4 py-2 font-medium"
-                title={hasStructureErrors 
-                  ? "Analyze data (will attempt analysis despite structural issues)" 
-                  : "Run comprehensive data analysis with Detective D"}
-              >
-                {isAnalyzing ? (
-                  <>
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs font-medium">Analyzing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    <span className="text-xs font-medium">Analyze Data</span>
-                  </>
-                )}
-              </Button>
-            )}
+            
+
 
             {/* Reset/Clear Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 gap-1 px-2"
-              title="Reset / Clear"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span className="text-xs font-medium">Reset</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleReset}
+                  className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 gap-1 px-2"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span className="text-xs font-medium">Reset</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Reset / Clear</TooltipContent>
+            </Tooltip>
 
-            {/* Theme Toggle */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="relative p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center w-9 h-9"
-              title="Toggle Theme"
-            >
-              <Sun className="h-4 w-4 absolute rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="h-4 w-4 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            </button>
-
-            {/* Help/Documentation Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            {/* Feedback Button - Top Bar (Help style) */}
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <button
+                  onClick={() => setFeedbackModalOpen(true)}
+                  className="p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center min-w-[44px] h-9 gap-2"
+                  style={{ minWidth: '110px' }}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Feedback</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Send Feedback</TooltipContent>
+            </Tooltip>
+
+            {/* Stay Connected Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setStayConnectedModalOpen(true)}
                   className="p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center w-9 h-9"
-                  title="Help & Documentation"
+                >
+                  <Bell className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Stay Connected</TooltipContent>
+            </Tooltip>
+
+            {/* Help Center Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setHelpCenterOpen(true)}
+                  className="p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center w-9 h-9"
                 >
                   <HelpCircle className="h-4 w-4" />
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800">
-                <DropdownMenuItem className="text-slate-300 focus:bg-slate-800 focus:text-slate-100 cursor-pointer">
-                  FAQ
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-slate-300 focus:bg-slate-800 focus:text-slate-100 cursor-pointer">
-                  Examples
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-slate-300 focus:bg-slate-800 focus:text-slate-100 cursor-pointer">
-                  How Detective D Works
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Help & Documentation</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </nav>
@@ -1207,7 +1564,7 @@ const DetectiveD = () => {
               key={file.id}
               onClick={() => setActiveFileId(file.id)}
               className={`
-                flex items-center gap-2 px-3 py-1.5 text-sm border-r border-slate-800 whitespace-nowrap
+                flex items-center gap-2 px-3 py-1.5 text-sm border-r border-slate-800 whitespace-nowrap !rounded-none
                 transition-colors group relative
                 ${activeFileId === file.id 
                   ? 'bg-slate-800/50 text-slate-100' 
@@ -1219,19 +1576,23 @@ const DetectiveD = () => {
               <span className="max-w-[150px] truncate">{file.name}</span>
               <button
                 onClick={(e) => closeFile(file.id, e)}
-                className="opacity-0 group-hover:opacity-100 hover:bg-slate-700 rounded p-0.5 transition-opacity"
+                className="opacity-0 group-hover:opacity-100 hover:bg-slate-700 rounded-none p-0.5 transition-opacity"
               >
                 <X className="h-3 w-3" />
               </button>
             </button>
           ))}
-          <button
-            onClick={handleFileUpload}
-            className="flex items-center gap-1 px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors"
-            title="Upload another file"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleFileUpload}
+                className="flex items-center gap-1 px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors !rounded-none"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Upload another file</TooltipContent>
+          </Tooltip>
         </div>
       )}
 
@@ -1259,135 +1620,77 @@ const DetectiveD = () => {
             </div>
           ) : (activeFile && (structureIssues.length > 0 || errors.length > 0)) ? (
             <div className="py-1">
-              {/* Info Banner */}
-              <div className="px-3 py-2.5 bg-[#1A1D20] border-b border-[#1C1F22]">
-                <div className="text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#E6E7E9]">
-                      {structureIssues.filter(i => i.type === 'error').length + errors.filter(e => e.type === 'error').length} errors found
-                    </span>
-                  </div>
-                  <div className="text-[#7A7F86]">
-                    {isRealTimeValidating 
-                      ? 'Validating structure in real-time...'
-                      : structureIssues.length > 0 
-                        ? 'Real-time structure validation active'
-                        : 'Real-time validation active — issues detected as you edit'
-                    }
-                  </div>
-                </div>
-              </div>
-              
-              {/* Structure Issues First (if any) */}
-              {structureIssues.length > 0 && (
-                <>
-                  <div className="px-3 py-2 bg-[#1E1A00] border-b border-[#2A2400] flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-orange-400"></div>
-                    <span className="text-xs font-semibold text-orange-200 uppercase tracking-wide">
-                      Structure Issues ({structureIssues.length})
-                    </span>
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="text-xs text-orange-300 bg-orange-500/20 px-2 py-1 rounded">
-                        Manual fixes needed
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Helpful instruction banner */}
-                  <div className="px-3 py-2 bg-orange-500/5 border-b border-orange-500/20">
-                    <div className="text-xs text-orange-300 space-y-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-orange-400">📝</span>
-                        <span className="font-medium">Click on any issue below to jump to the line in the editor</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-blue-400">📊</span>
-                        <span>Analysis can still run with structure issues, but fixing them improves accuracy</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {structureIssues.map((issue) => (
-                    <button
-                      key={issue.id}
-                      onClick={() => {
-                        setSelectedStructureIssue(issue);
-                        setSelectedErrorId(null); // Clear semantic error selection
-                        // Navigate to error line in editor
-                        if (editorRef.current) {
-                          editorRef.current.revealLineInCenter(issue.line);
-                          editorRef.current.setPosition({ lineNumber: issue.line, column: issue.column || 1 });
-                        }
-                      }}
-                      className={`
-                        w-full px-3 py-3 text-left transition-all
-                        hover:bg-[#1A1600] border-b border-orange-500/10
-                        ${
-                          selectedStructureIssue?.id === issue.id 
-                            ? 'bg-[#1A1600] border-l-4 border-orange-500' 
-                            : 'border-l-4 border-orange-500/30 hover:border-orange-500/50'
-                        }
-                      `}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            {issue.type === 'error' ? (
-                              <CircleAlert className="h-4 w-4 text-red-400 flex-shrink-0" strokeWidth={2} />
-                            ) : (
-                              <TriangleAlert className="h-4 w-4 text-yellow-400 flex-shrink-0" strokeWidth={2} />
-                            )}
-                            <span className="text-xs font-medium text-orange-200">
-                              {issue.message}
-                            </span>
-                          </div>
-                          <ExternalLink className="h-3.5 w-3.5 text-orange-400/60 flex-shrink-0" />
+              {/* Structure Issues with debugging */}
+              {structureIssues.map((issue) => {
+                // Add debugging for issue display
+                console.log('Rendering structure issue:', {
+                  id: issue.id,
+                  type: issue.type,
+                  line: issue.line,
+                  column: issue.column,
+                  message: issue.message,
+                  pattern: issue.pattern
+                });
+                
+                // Fallback message if issue.message is corrupted
+                const displayMessage = issue.message || 'Structure issue detected';
+                
+                return (
+                  <button
+                    key={issue.id}
+                    onClick={() => {
+                      console.log('Selected structure issue:', issue);
+                      setSelectedStructureIssue(issue);
+                      setSelectedErrorId(null);
+                      if (editorRef.current) {
+                        editorRef.current.revealLineInCenter(issue.line);
+                        editorRef.current.setPosition({ lineNumber: issue.line, column: issue.column || 1 });
+                      }
+                    }}
+                    className={`
+                      w-full px-3 py-2.5 text-left transition-all
+                      border-b border-[#1C1F22] !rounded-none group
+                      ${
+                        selectedStructureIssue?.id === issue.id 
+                          ? 'border-l-4 border-l-red-500' 
+                          : 'border-l-4 border-l-red-500/40 hover:border-l-red-500'
+                      }
+                    `}
+                  >
+                    <div className="flex items-start gap-2">
+                      {issue.type === 'error' ? (
+                        <CircleAlert className="h-3.5 w-3.5 text-[#E6E7E9] mt-0.5 flex-shrink-0" strokeWidth={2} />
+                      ) : (
+                        <TriangleAlert className="h-3.5 w-3.5 text-[#E6E7E9] mt-0.5 flex-shrink-0" strokeWidth={2} />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-[#E6E7E9] leading-tight">
+                          {displayMessage}
                         </div>
-                        
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-gray-400 font-mono bg-gray-800/50 px-2 py-1 rounded">
-                            Line {issue.line}:{issue.column}
-                          </span>
-                          <span className="text-gray-400 font-mono bg-gray-800/50 px-2 py-1 rounded">
-                            {issue.pattern}
-                          </span>
-                          {issue.type === 'error' ? (
-                            <span className="text-red-400 bg-red-500/10 px-2 py-1 rounded">
-                              ERROR
-                            </span>
-                          ) : (
-                            <span className="text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded">
-                              WARNING
-                            </span>
-                          )}
+                        <div className="text-xs text-[#7A7F86] mt-1">
+                          <span>Structure</span>
                         </div>
-                        
-                        {issue.suggestedFix && issue.suggestedFix !== 'Manual review required' && (
-                          <div className="text-xs mt-2">
-                            <span className="text-green-400">🔧 Fix: </span>
-                            <span className="text-green-300">{issue.suggestedFix}</span>
-                          </div>
-                        )}
                       </div>
-                    </button>
-                  ))}
-                </>
-              )}
+                    </div>
+                  </button>
+                );
+              })}
               
-              {/* Semantic Errors (if structure is valid) */}
-              {structureIssues.length === 0 && errors.map((error) => (
+              {/* Semantic Errors (analysis findings) */}
+              {errors.length > 0 && errors.map((error) => (
                 <button
                   key={error.id}
                   onClick={() => {
                     setSelectedErrorId(error.id);
-                    setSelectedStructureIssue(null); // Clear structure issue selection
+                    setSelectedStructureIssue(null);
                   }}
                   className={`
-                    w-full px-3 py-2 text-left transition-all
-                    hover:bg-[#1A1D20]
-                    ${selectedErrorId === error.id 
-                      ? 'bg-[#1A1D20] border-l-2 border-[#3D8BFF]' 
-                      : 'border-l-2 border-transparent'
+                    w-full px-3 py-2.5 text-left transition-all
+                    border-b border-[#1C1F22] !rounded-none group
+                    ${
+                      selectedErrorId === error.id 
+                        ? 'border-l-4 ' + (error.severity === 'error' ? 'border-l-orange-500' : error.severity === 'warning' ? 'border-l-yellow-500' : 'border-l-blue-500')
+                        : 'border-l-4 ' + (error.severity === 'error' ? 'border-l-orange-500/40 hover:border-l-orange-500' : error.severity === 'warning' ? 'border-l-yellow-500/40 hover:border-l-yellow-500' : 'border-l-blue-500/40 hover:border-l-blue-500')
                     }
                   `}
                 >
@@ -1398,53 +1701,16 @@ const DetectiveD = () => {
                       <TriangleAlert className="h-3.5 w-3.5 text-[#E6E7E9] mt-0.5 flex-shrink-0" strokeWidth={2} />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium text-[#E6E7E9] leading-tight">
-                          {error.message}
-                        </div>
-
+                      <div className="text-sm font-medium text-[#E6E7E9] leading-tight">
+                        {error.message}
                       </div>
-                      <div className="text-xs text-[#7A7F86] mt-1 flex items-center gap-1.5">
+                      <div className="text-xs text-[#7A7F86] mt-1">
                         <span>{error.category}</span>
-                        {error.severity && (
-                          <>
-                            <span>•</span>
-                            <span className={`font-medium ${
-                              error.severity === 'error' ? 'text-red-400' :
-                              error.severity === 'warning' ? 'text-yellow-400' :
-                              'text-blue-400'
-                            }`}>
-                              {error.severity}
-                            </span>
-                          </>
-                        )}
-                        <span>•</span>
-                        <span>Line {error.line}</span>
                       </div>
                     </div>
                   </div>
                 </button>
               ))}
-            </div>
-          ) : (
-            <div className="px-3 py-8 text-center space-y-3">
-              <div className="flex justify-center mb-3">
-                <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-              <div className="text-sm font-semibold text-[#E6E7E9]">✓ No issues found</div>
-              <div className="text-xs text-[#7A7F86]">Your data looks clean and valid!</div>
-              <div className="pt-4 border-t border-[#1C1F22]">
-                <div className="text-xs text-[#5A5F66] font-semibold mb-2">💡 Automatic Analysis:</div>
-                <div className="text-xs text-[#5A5F66] leading-relaxed space-y-1">
-                  <div>✓ Analysis runs automatically on upload</div>
-                  <div>✓ Real-time scanning as you edit</div>
-                  <div>✓ No buttons needed - it just works!</div>
-                </div>
-              </div>
             </div>
           ) : activeFile ? (
             <div className="px-3 py-8 text-center space-y-3">
@@ -1458,7 +1724,7 @@ const DetectiveD = () => {
               <div className="text-sm font-semibold text-[#E6E7E9]">✓ No issues found</div>
               <div className="text-xs text-[#7A7F86]">Your data looks clean and valid!</div>
               <div className="pt-4 border-t border-[#1C1F22]">
-                <div className="text-xs text-[#5A5F66] font-semibold mb-2">💡 Automatic Analysis:</div>
+                <div className="text-xs text-[#5A5F66] font-semibold mb-2">Automatic Analysis:</div>
                 <div className="text-xs text-[#5A5F66] leading-relaxed space-y-1">
                   <div>✓ Analysis runs automatically on upload</div>
                   <div>✓ Real-time scanning as you edit</div>
@@ -1468,7 +1734,11 @@ const DetectiveD = () => {
             </div>
           ) : (
             <div className="px-4 py-8 text-center text-sm text-[#9CA0A6]">
-              No file uploaded yet. Upload or paste a file to run structure validation and analysis.
+              No file uploaded yet. 
+              <div className="pt-8">Upload or paste a file to run 
+              </div>
+                <div>structure validation and analysis.
+                </div>
             </div>
           )}
         </div>
@@ -1490,46 +1760,66 @@ const DetectiveD = () => {
                 
                 {/* Right: Action Buttons */}
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setViewMode('table')}
-                    className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
-                    title="Table view"
-                  >
-                    <Table className="h-3 w-3" strokeWidth={2} />
-                    Table
-                  </button>
-                  <button
-                    onClick={() => setViewMode('text')}
-                    className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'text' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
-                    title="Text view"
-                  >
-                    <AlignLeft className="h-3 w-3" strokeWidth={2} />
-                    Text
-                  </button>
-                  <button
-                    onClick={handleBeautify}
-                    className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
-                    title="Format / Beautify"
-                  >
-                    <Wand2 className="h-3 w-3" strokeWidth={2} />
-                    Pretty Print
-                  </button>
-                  <button
-                    onClick={handleMinify}
-                    className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
-                    title="Minify"
-                  >
-                    <Minimize2 className="h-3 w-3" strokeWidth={2} />
-                    Minify
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
-                    title="Download"
-                  >
-                    <Download className="h-3 w-3" strokeWidth={2} />
-                    Download
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setViewMode('table')}
+                        className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
+                      >
+                        <Table className="h-3 w-3" strokeWidth={2} />
+                        Table
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Table view</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setViewMode('text')}
+                        className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'text' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
+                      >
+                        <AlignLeft className="h-3 w-3" strokeWidth={2} />
+                        Text
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Text view</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleBeautify}
+                        className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
+                      >
+                        <Wand2 className="h-3 w-3" strokeWidth={2} />
+                        Pretty Print
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Format / Beautify</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleMinify}
+                        className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
+                      >
+                        <Minimize2 className="h-3 w-3" strokeWidth={2} />
+                        Minify
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Minify</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleDownload}
+                        className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
+                      >
+                        <Download className="h-3 w-3" strokeWidth={2} />
+                        Download
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Download</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -1638,7 +1928,7 @@ const DetectiveD = () => {
                       renderLineHighlight: 'line',
                       cursorStyle: 'line',
                       cursorBlinking: 'smooth',
-                      cursorSmoothCaretAnimation: 'on',
+                      cursorSmoothCaretAnimation: 'off',
                       smoothScrolling: true,
                       padding: { top: 16, bottom: 16 },
                       lineNumbers: 'on',
@@ -1656,8 +1946,8 @@ const DetectiveD = () => {
                       insertSpaces: true,
                       detectIndentation: true,
                       trimAutoWhitespace: true,
-                      formatOnPaste: true,
-                      formatOnType: true,
+                      formatOnPaste: false,
+                      formatOnType: false,
                       guides: {
                         indentation: true,
                         highlightActiveIndentation: true,
@@ -1684,10 +1974,8 @@ const DetectiveD = () => {
                   <div className="text-sm text-[#E6E7E9] mb-1 font-medium">No file selected</div>
                   <div className="text-xs text-[#7A7F86]">Upload a file to start analyzing</div>
                 </div>
-                <div className="pt-3 border-t border-[#1C1F22] text-xs text-[#5A5F66] space-y-1">
+                <div className="pt-3 border-t border-[#1C1F22] text-xs text-[#5A5F66]">
                   <div>Supported: JSON, CSV, XML, YAML</div>
-                  <div>Max size: <span className="font-semibold text-[#7A7F86]">{MAX_FILE_SIZE_MB}MB</span></div>
-                  <div>AI analysis available up to 5MB</div>
                 </div>
               </div>
             </div>
@@ -1695,7 +1983,7 @@ const DetectiveD = () => {
         </div>
 
         {/* Right Panel - Error Details Analysis */}
-        <div className="border-l border-[#1C1F22] bg-[#101113] overflow-y-auto">
+        <div className="right-panel border-l border-[#1C1F22] bg-[#101113] overflow-y-auto">
           {(selectedErrorId || selectedStructureIssue) && activeFile ? (
             (() => {
               // Handle structure issues
@@ -1709,7 +1997,7 @@ const DetectiveD = () => {
                     <div className="px-4 py-4 space-y-5 overflow-y-auto flex-1">
                       <div>
                         <h3 className="text-base font-semibold text-[#E6E7E9] leading-snug">
-                          {selectedStructureIssue.message}
+                          {selectedStructureIssue.message.replace(/at position \d+\s*\(line \d+,\s*column \d+\)/i, '').trim()}
                         </h3>
                       </div>
 
@@ -1742,7 +2030,7 @@ const DetectiveD = () => {
                         </div>
                         <p className="text-sm text-[#D0D3D8] leading-relaxed">
                           Structure issues prevent proper data processing and can cause errors when importing or validating your data.
-                          However, you can still run analysis - Detective D will attempt to work with the data despite these issues.
+                          <strong className="text-orange-300 block mt-2">⚠️ Please fix these structural issues before running data analysis.</strong>
                         </p>
                       </div>
 
@@ -1754,7 +2042,7 @@ const DetectiveD = () => {
                           <div className="bg-[#0F1113] border border-[#1C1F22] rounded-md p-3">
                             <div className="text-sm text-[#D0D3D8] leading-relaxed space-y-2">
                               <div className="font-medium text-orange-300">
-                                📝 Manual Fix Required
+                                Manual Fix Required
                               </div>
                               <div>
                                 {selectedStructureIssue.suggestedFix && selectedStructureIssue.suggestedFix !== 'Manual review required' 
@@ -1778,12 +2066,12 @@ const DetectiveD = () => {
                             </div>
                           )}
                           
-                          <div className="bg-green-500/5 border border-green-500/20 rounded-md p-3">
-                            <div className="text-xs font-medium text-green-400 mb-1">
-                              💡 Analysis Available
+                          <div className="bg-orange-500/5 border border-orange-500/20 rounded-md p-3">
+                            <div className="text-xs font-medium text-orange-400 mb-1">
+                              🚫 Analysis Blocked
                             </div>
-                            <div className="text-xs text-green-300">
-                              You can still proceed with data analysis. Click the Analyze button to run Detective D even with structure issues present.
+                            <div className="text-xs text-orange-300">
+                              Fix these structural issues first, then you can run Detective D analysis. Structure errors must be resolved before semantic analysis can proceed.
                             </div>
                           </div>
                         </div>
@@ -1799,8 +2087,6 @@ const DetectiveD = () => {
 
               const context = getErrorContext(selectedError, editorContent, activeFile.name);
               const categoryInfo = getCategoryInfo(selectedError.category);
-              const confidenceNum = typeof selectedError.confidence === 'number' ? selectedError.confidence : 95;
-              const confidenceLevel = confidenceNum >= 90 ? 'High' : confidenceNum >= 75 ? 'Medium' : 'Low';
 
               return (
                 <div className="h-full flex flex-col">
@@ -1815,7 +2101,7 @@ const DetectiveD = () => {
                     {/* 1. What is wrong - Error Title */}
                     <div>
                       <h3 className="text-base font-semibold text-[#E6E7E9] leading-snug">
-                        {selectedError.message}
+                        {selectedError.message.replace(/at position \d+\s*\(line \d+,\s*column \d+\)/i, '').trim()}
                       </h3>
                     </div>
 
@@ -1899,34 +2185,8 @@ const DetectiveD = () => {
                       </div>
                     </div>
 
-                    {/* Confidence Indicator */}
-                    <div className="space-y-1.5">
-                      <div className="text-xs font-semibold text-[#7A7F86] uppercase tracking-wide">
-                        Confidence
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-[#0F1113] rounded-full h-1.5 overflow-hidden">
-                          <div 
-                            className={`h-full transition-all ${
-                              confidenceNum >= 90 ? 'bg-green-500' :
-                              confidenceNum >= 75 ? 'bg-blue-500' :
-                              'bg-yellow-500'
-                            }`}
-                            style={{ width: `${confidenceNum}%` }}
-                          />
-                        </div>
-                        <span className={`text-sm font-semibold min-w-[55px] ${
-                          confidenceNum >= 90 ? 'text-green-400' :
-                          confidenceNum >= 75 ? 'text-blue-400' :
-                          'text-yellow-400'
-                        }`}>
-                          {confidenceLevel}
-                        </span>
-                      </div>
-                    </div>
-
                     {/* Quick Actions */}
-                    <div className="pt-2 flex gap-2">
+                    <div className="pt-2">
                       <button
                         onClick={() => {
                           if (editorRef.current) {
@@ -1938,21 +2198,9 @@ const DetectiveD = () => {
                             editorRef.current.focus();
                           }
                         }}
-                        className="flex-1 px-3 py-2 bg-primary hover:bg-primary/80 text-white text-sm font-medium rounded transition-colors"
+                        className="w-full px-3 py-2 bg-primary hover:bg-primary/80 text-white text-sm font-medium rounded transition-colors"
                       >
                         Go to Line
-                      </button>
-                      <button
-                        onClick={() => {
-                          const fixText = selectedError.suggestions && selectedError.suggestions.length > 0
-                            ? selectedError.suggestions[0]
-                            : (context && typeof context === 'object' && 'suggestion' in context ? (context as any).suggestion : '');
-                          navigator.clipboard.writeText(fixText);
-                          toast.success("Fix suggestion copied to clipboard");
-                        }}
-                        className="flex-1 px-3 py-2 bg-[#1C1F22] hover:bg-[#24272B] text-[#E6E7E9] text-sm font-medium rounded transition-colors"
-                      >
-                        Copy Fix
                       </button>
                     </div>
 
@@ -1977,6 +2225,332 @@ const DetectiveD = () => {
           )}
         </div>
       </main>
+
+
+      {/* Footer */}
+      {activeFile && (
+        <footer className="relative border-t border-[#1C1F22] bg-[#0d0f13] px-4 py-3 flex items-center justify-between text-xs">
+          <div className="flex-1 flex items-center gap-2 text-slate-400">
+            <FileCode className="h-3.5 w-3.5" />
+            <span className="font-medium text-slate-300">{activeFile.name}</span>
+            <span className="text-slate-600">•</span>
+            <span>{structureIssues.length + errors.length} issue{(structureIssues.length + errors.length) !== 1 ? 's' : ''}</span>
+            {/* Structure OK badge moved to appear after the issues count */}
+            { !isRealTimeValidating && structureIssues.length === 0 && (
+              <div className="flex items-center gap-2 ml-2">
+                <div className="h-2 w-2 rounded-full bg-green-400" />
+                <span className="text-xs font-medium text-green-300 bg-green-900/20 border border-green-500/30 px-2 py-0.5 rounded-md">Structure OK</span>
+              </div>
+            )}
+          </div>
+          {/* Center text: Actively improving */}
+          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-slate-500 text-xs flex items-center gap-1 pointer-events-none">
+            <AlertCircle className="h-3 w-3" />
+            <span>Actively improving. Results may vary.</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setStayConnectedModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-slate-300 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  <span className="font-medium">Export</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Export error report</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setStayConnectedModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-slate-300 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  <span className="font-medium">Share</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Share results</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setStayConnectedModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-slate-300 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  <span className="font-medium">Audit</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Generate audit log</TooltipContent>
+            </Tooltip>
+          </div>
+        </footer>
+      )}
+
+      {/* Help Center Modal */}
+      <HelpCenterModal
+        open={helpCenterOpen}
+        onOpenChange={setHelpCenterOpen}
+      />
+
+      {/* Stay Connected Modal - Simple Light Mode */}
+      {stayConnectedModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Stay in the loop</h2>
+                <p className="text-sm text-gray-600 mt-1">Get product updates and improvements</p>
+              </div>
+              <button
+                onClick={() => setStayConnectedModalOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Email Input */}
+              <div>
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={stayConnectedEmail}
+                  onChange={(e) => setStayConnectedEmail(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                />
+              </div>
+
+              {/* Consent Checkbox */}
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stayConnectedOptIn}
+                  onChange={(e) => setStayConnectedOptIn(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 bg-white accent-blue-600 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700">I'd like to receive product updates and improvements</span>
+              </label>
+              <p className="text-xs text-gray-500">No spam. Unsubscribe anytime.</p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3 justify-end">
+              <button
+                onClick={() => setStayConnectedModalOpen(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 font-medium rounded transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!stayConnectedEmail.trim()) {
+                    toast.error('Please enter your email', { duration: 3000 });
+                    return;
+                  }
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  if (!emailRegex.test(stayConnectedEmail.toLowerCase().trim())) {
+                    toast.error('Please enter a valid email', { duration: 3000 });
+                    return;
+                  }
+                  try {
+                    const { error } = await supabase
+                      .from('notification_subscriptions')
+                      .insert([{ email: stayConnectedEmail.toLowerCase().trim(), subscribed_at: new Date().toISOString() }])
+                      .select();
+                    if (error && error.code === '23505') {
+                      toast.success('Already subscribed!', { description: 'You\'re already on our list.', duration: 3000 });
+                    } else if (error) {
+                      throw error;
+                    } else {
+                      toast.success('You\'re subscribed!', { description: 'Watch for updates from DatumInt.', duration: 3000 });
+                      setStayConnectedModalOpen(false);
+                      setStayConnectedEmail('');
+                      setStayConnectedOptIn(false);
+                    }
+                  } catch (err) {
+                    console.error('Subscription error:', err);
+                    toast.error('Failed to subscribe', { duration: 3000 });
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors text-sm"
+              >
+                Subscribe
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal - Simple Light Mode */}
+      {feedbackModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Tell us what you think</h2>
+                <p className="text-sm text-gray-600 mt-1">Help us improve Detective D</p>
+              </div>
+              <button
+                onClick={() => {
+                  setFeedbackModalOpen(false);
+                  setFeedbackText("");
+                  setFeedbackEmail("");
+                  setFeedbackOptIn(false);
+                }}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Feedback Textarea */}
+              <textarea
+                placeholder="What do you think? Any issues or suggestions?..."
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none h-20 transition-all"
+              />
+
+              {/* Email Input */}
+              <input
+                type="email"
+                placeholder="your@email.com (optional)"
+                value={feedbackEmail}
+                onChange={(e) => setFeedbackEmail(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              />
+
+              {/* Consent Checkbox */}
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={feedbackOptIn}
+                  onChange={(e) => setFeedbackOptIn(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 bg-white accent-blue-600 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700">Follow up with me about my feedback</span>
+              </label>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setFeedbackModalOpen(false);
+                  setFeedbackText("");
+                  setFeedbackEmail("");
+                  setFeedbackOptIn(false);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 font-medium rounded transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!feedbackText.trim()) {
+                    toast.error('Please share your feedback', { duration: 3000 });
+                    return;
+                  }
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  if (feedbackEmail && !emailRegex.test(feedbackEmail.toLowerCase().trim())) {
+                    toast.error('Please enter a valid email', { duration: 3000 });
+                    return;
+                  }
+                  toast.success("Thank you for your feedback!", { description: 'We appreciate your input.', duration: 3000 });
+                  setFeedbackModalOpen(false);
+                  setFeedbackText("");
+                  setFeedbackEmail("");
+                  setFeedbackOptIn(false);
+                }}
+                disabled={!feedbackText.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors text-sm"
+              >
+                Send Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Center Modal */}
+      <HelpCenterModal open={helpCenterOpen} onOpenChange={setHelpCenterOpen} />
+
+      {/* Detective D Explainer Modal - shows on first visit */}
+      <DetectiveDExplainerModal open={showExplainerModal} onOpenChange={setShowExplainerModal} />
+
+      {/* Footer Action Modals */}
+      {activeFile && (
+        <>
+          <ShareModal
+            open={shareModalOpen}
+            onOpenChange={setShareModalOpen}
+            fileName={activeFile.name}
+            issueCount={structureIssues.length + errors.length}
+          />
+          <AuditLogModal
+            open={auditModalOpen}
+            onOpenChange={setAuditModalOpen}
+            fileName={activeFile.name}
+            issueCount={structureIssues.length + errors.length}
+            errorCount={errors.filter(e => e.severity === 'error').length}
+            warningCount={errors.filter(e => e.severity === 'warning').length}
+            structureIssues={structureIssues}
+            errors={errors}
+          />
+          <ExportModal
+            open={exportModalOpen}
+            onOpenChange={setExportModalOpen}
+            fileName={activeFile.name}
+            content={editorContent}
+            issues={[...structureIssues, ...errors]}
+            analysisResult={{
+              timestamp: new Date().toISOString(),
+              structureValidation: {
+                totalIssues: structureIssues.length,
+                issues: structureIssues
+              },
+              semanticAnalysis: {
+                totalIssues: errors.length,
+                byCategory: errors.reduce((acc: any, e: any) => {
+                  acc[e.category] = (acc[e.category] || 0) + 1;
+                  return acc;
+                }, {}),
+                issues: errors
+              }
+            }}
+          />
+        </>
+      )}
+
+      {/* File Limit Modal */}
+      {showFileLimitModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-900 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-slate-700">
+            <h2 className="text-xl font-semibold text-white mb-3">Maximum Files Limit Reached</h2>
+            <p className="text-slate-300 mb-6">
+              You can only have 2 files open at a time. Please close a file first to open another.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowFileLimitModal(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

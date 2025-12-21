@@ -1,0 +1,5 @@
+name,age,email,score
+Alice Smith,25,alice@example.com,98.5
+Bob,thirty,bob@invalid,95.2
+Charlie Brown,28,,87.0
+David Jones,35,david@test.com,invalid_score

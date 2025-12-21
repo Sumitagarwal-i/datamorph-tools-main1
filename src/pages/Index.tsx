@@ -9,6 +9,7 @@ import { lazy, Suspense, memo, useState, useEffect } from "react";
 import { NotificationModal } from "@/components/NotificationModal";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { DetectiveDBanner } from "@/components/DetectiveDBanner";
+import { YouTubeEmbed } from "@/components/YouTubeEmbed";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
@@ -147,49 +148,74 @@ const Index = () => {
 
           
 
+          {/* What is Detective D Section */}
+          <section className="mt-10 sm:mt-14 lg:mt-20 max-w-6xl mx-auto px-2 sm:px-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+              {/* Left side - Text */}
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">What is Detective D?</h2>
+                  <p className="text-lg text-slate-600 leading-relaxed mb-4">
+                    Detective D is DatumInt's intelligent data quality engine that goes beyond syntax checking. It analyzes your JSON, CSV, XML, and YAML files to find hidden structural issues, invalid values, and data inconsistencies that could break your applications.
+                  </p>
+                  <p className="text-slate-600 leading-relaxed mb-4">
+                    Upload your data file and Detective D instantly scans it for:
+                  </p>
+                  <ul className="space-y-2 text-slate-600 ml-4">
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary font-bold mt-1">•</span>
+                      <span><strong>Structure errors</strong> - Missing brackets, quotes, colons, or other formatting issues</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary font-bold mt-1">•</span>
+                      <span><strong>Invalid values</strong> - NaN, Infinity, empty fields, and type mismatches</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary font-bold mt-1">•</span>
+                      <span><strong>Data anomalies</strong> - Duplicate entries, missing required fields, and inconsistencies</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary font-bold mt-1">•</span>
+                      <span><strong>Logic issues</strong> - Suspicious patterns and values that don't match expected ranges</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Right side - Video */}
+              <div className="rounded-lg overflow-hidden shadow-lg">
+                <YouTubeEmbed videoId="OSBS0LnuYUQ" title="What is Detective D" />
+              </div>
+            </div>
+          </section>
+
           {/* Features List */}
           <section className="mt-10 sm:mt-14 lg:mt-20 max-w-4xl mx-auto px-1 sm:px-4">
             <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-center mb-6 sm:mb-8 lg:mb-10">Why Choose DatumInt?</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
               <BenefitItem 
-                title="No Account Required" 
-                description="Start converting immediately without signing up" 
+                title="Auto-Detect & Convert" 
+                description="Instantly convert between JSON, CSV, XML, and YAML with one-click detection" 
               />
               <BenefitItem 
-                title="Smart Auto-Detection" 
-                description="Automatically detects your data format" 
+                title="Repair & Validate" 
+                description="Fix broken JSON and CSV files automatically, then validate structure and data quality" 
               />
               <BenefitItem 
-                title="1-Click JSON Repair" 
-                description="Automatically fix broken JSON with missing commas, quotes, or brackets" 
+                title="Detective D - Deep Analysis" 
+                description="Find hidden data issues: invalid values, duplicates, type mismatches, and suspicious patterns" 
               />
               <BenefitItem 
-                title="Instant JSON Minification" 
-                description="Minify JSON output directly in your workflow" 
-              />
-              <BenefitItem 
-                title="Smart Nested JSON to CSV" 
-                description="Intelligently flattens complex nested structures into proper CSV rows" 
-              />
-              <BenefitItem 
-                title="Drag & Drop Support" 
-                description="Simply drag files to convert them" 
-              />
-              <BenefitItem 
-                title="More Actions - JSON & CSV" 
-                description="Format, validate, and manipulate JSON & CSV data instantly" 
-              />
-              <BenefitItem 
-                title="Handles Complex Data" 
-                description="Nested objects, arrays, and special characters" 
+                title="Transform & Format" 
+                description="Beautify, minify, flatten nested JSON, and manipulate CSV data instantly" 
               />
               <BenefitItem 
                 title="100% Private & Secure" 
                 description="All processing happens in your browser, no data sent to servers" 
               />
               <BenefitItem 
-                title="Works Offline" 
-                description="No internet required after initial load" 
+                title="No Account Required" 
+                description="Start using immediately with full features - no signup, no restrictions" 
               />
             </div>
           </section>
@@ -202,7 +228,7 @@ const Index = () => {
         <footer className="border-t border-border mt-8 sm:mt-12 lg:mt-16 py-4 sm:py-6">
           <div className="container mx-auto px-2 sm:px-4 text-center">
             <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-              Made with ❤️ for fast data conversion
+              Made with ❤️ for data
             </p>
             <p className="text-xs text-muted-foreground">
               • Privacy first • No data collection

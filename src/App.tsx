@@ -3,25 +3,27 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, memo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Analytics } from "@vercel/analytics/react";
 
-// Lazy load pages for code splitting
+// Lazy load pages for code splitting with eager loading
 const Index = lazy(() => import("./pages/Index"));
 const DetectiveD = lazy(() => import("./pages/DetectiveD"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Loading fallback
-const PageLoader = () => (
+// Loading fallback - memoized to prevent re-renders
+const PageLoader = memo(() => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
   </div>
-);
+));
 
-// Error fallback
-const ErrorFallback = ({ error }: { error: Error }) => (
+PageLoader.displayName = "PageLoader";
+
+// Error fallback - memoized to prevent re-renders
+const ErrorFallback = memo(({ error }: { error: Error }) => (
   <div className="flex items-center justify-center min-h-screen p-4">
     <div className="text-center">
       <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
@@ -34,7 +36,9 @@ const ErrorFallback = ({ error }: { error: Error }) => (
       </button>
     </div>
   </div>
-);
+));
+
+ErrorFallback.displayName = "ErrorFallback";
 
 const App = () => {
   // Memoize QueryClient to prevent recreating on every render

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { FeedbackModal } from "./FeedbackModal";
 import { ContactModal } from "./ContactModal";
-import { PasscodeModal } from "./PasscodeModal";
 import { useNavigate } from "react-router-dom";
 
 export const Header = () => {
@@ -12,7 +11,6 @@ export const Header = () => {
   const navigate = useNavigate();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const [passcodeOpen, setPasscodeOpen] = useState(false);
 
   return (
     <>
@@ -32,24 +30,21 @@ export const Header = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPasscodeOpen(true)}
-                className="gap-2 px-3 sm:px-4 h-9 rounded-[0.5rem] border border-border text-gray-900 dark:text-white font-semibold relative"
+                onClick={() => navigate('/detective-d')}
+                className="gap-1 px-3 sm:px-4 h-9 rounded-[0.5rem] border border-border text-gray-900 dark:text-white font-semibold relative"
               >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 flex-shrink-0">
-                  {/* Detective D Logo - enlarged lens for maximum clarity (handle removed) */}
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M9 12H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M12 9V15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  <circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/>
-                  <circle cx="15.5" cy="8.5" r="1.4" fill="currentColor"/>
-                  <circle cx="8.5" cy="15.5" r="1.4" fill="currentColor"/>
-                  <circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"/>
-                </svg>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-9 w-9 flex-shrink-0">
+                    {/* Detective D Logo - zoom-in magnifier (circle + plus) with prominent handle */}
+                    <circle cx="11" cy="11" r="6.2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    {/* plus sign for zoom-in */}
+                    <path d="M11 8.5v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M8.5 11h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    {/* handle - angled down-right, thicker and connected to circle */}
+                    <path d="M15.2 15.2 L20 20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  </svg>
                 <span className="hidden sm:inline text-xs">DETECTIVE D</span>
-                <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded-md text-[11px] uppercase tracking-wide font-medium bg-transparent text-primary dark:text-primary border border-primary/20 dark:border-primary/30">DEV</span>
                 {/* removed "Smart Fix" label and arrow icon as requested */}
               </Button>
-              <PasscodeModal open={passcodeOpen} onOpenChange={setPasscodeOpen} />
               <Button
                 variant="outline"
                 size="sm"

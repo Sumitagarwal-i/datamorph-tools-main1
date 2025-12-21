@@ -116,17 +116,30 @@ export class StructureValidator {
       return
     } catch (err: any) {
       this.analyzeJsonError(err)
+      // After analyzing the immediate parse failure, also run a broader
+      // scan for trailing commas so users can see multiple structural
+      // issues at once instead of one opaque 'unknown' error.
+      try {
+        this.detectAllTrailingCommas()
+      } catch (e) {
+        // Non-fatal - detection best-effort only
+      }
     }
   }
 
   private analyzeJsonError(err: Error): void {
     const message = err.message
-    const posMatch = message.match(/position (\\d+)/)
-    const position = posMatch ? parseInt(posMatch[1]) : 0
+    // Try several common variants of parser error messages and fall back
+    // to the last numeric token in the message as a final attempt.
+    const posMatch = message.match(/position\s+(\d+)/i)
+      || message.match(/at position\s+(\d+)/i)
+      || message.match(/position:\s*(\d+)/i)
+      || message.match(/(\d+)(?![\s\S]*\d)/)
+    const position = posMatch ? parseInt(posMatch[1] || posMatch[0]) : 0
     const lineInfo = this.getLineAndColumn(position)
 
     // Pattern detection and auto-fix suggestions
-    if (message.includes('Unexpected token } in JSON')) {
+    if (message.includes('Unexpected token } in JSON') || message.includes("Unexpected token }")) {
       this.detectTrailingComma(position, '}')
     } else if (message.includes('Unexpected token ] in JSON')) {
       this.detectTrailingComma(position, ']')
@@ -156,10 +169,38 @@ export class StructureValidator {
     }
   }
 
-  private detectTrailingComma(position: number, closingChar: string): void {
+  // Scan the whole document for trailing commas and add issues for each
+  private detectAllTrailingCommas(): void {
+    const regex = /,(?=\s*[\}\]])/g
+    let match: RegExpExecArray | null
+    const seen = new Set<number>()
+    while ((match = regex.exec(this.content)) !== null) {
+      const commaPos = match.index
+      // Avoid duplicate issues for the same position
+      if (seen.has(commaPos)) continue
+      seen.add(commaPos)
+      const commaLineInfo = this.getLineAndColumn(commaPos)
+      this.addIssue({
+        type: 'error',
+        pattern: 'TRAILING_COMMA',
+        line: commaLineInfo.line,
+        column: commaLineInfo.column,
+        message: 'Trailing comma before closing bracket',
+        originalText: this.getLineText(commaLineInfo.line),
+        suggestedFix: 'Remove trailing comma',
+        canAutoFix: true,
+        evidence: {
+          observed: ',',
+          context: this.getContextAroundPosition(commaPos, 40),
+          ruleViolated: 'RFC 7159 Trailing comma'
+        }
+      })
+    }
+  }
+
+  private detectTrailingComma(position: number, closingChar: string, lineInfo?: { line: number; column: number }): void {
     const beforeClosing = this.content.substring(0, position).trimEnd()
     if (beforeClosing.endsWith(',')) {
-      const lineInfo = this.getLineAndColumn(position)
       const commaPos = beforeClosing.length - 1
       const commaLineInfo = this.getLineAndColumn(commaPos)
       
@@ -181,10 +222,25 @@ export class StructureValidator {
     }
   }
 
-  private detectUnexpectedToken(position: number, message: string): void {
-    const lineInfo = this.getLineAndColumn(position)
-    const tokenMatch = message.match(/Unexpected token (.+?) in JSON/)
-    const token = tokenMatch ? tokenMatch[1] : 'unknown'
+  private detectUnexpectedToken(position: number, message: string, lineInfo?: { line: number; column: number }): void {
+    const finalLineInfo = lineInfo || this.getLineAndColumn(position)
+    let tokenMatch = message.match(/Unexpected token\s+(.+?)\s+in JSON/i)
+    if (!tokenMatch) tokenMatch = message.match(/Unexpected token\s+(.+?)\s+at position/i)
+    let token = tokenMatch ? tokenMatch[1] : ''
+    // If token still not found, derive from surrounding text to avoid 'unknown'.
+    if (!token) {
+      const ctx = this.getContextAroundPosition(position, 8).trim()
+      token = ctx ? ctx[0] : 'unknown'
+    }
+    
+    // CRITICAL FIX: [ and { are VALID at document start
+    // If [ or { appears at the very beginning, it's a valid JSON root
+    const trimmedStart = this.content.trimStart()
+    if (position === 0 && (token === '[' || token === '{')) {
+      // This is actually valid JSON. The error might be from something later.
+      // Don't report this as an error - likely a nested structural issue.
+      return
+    }
     
     // Check for common patterns
     if (token === ',' && this.isAfterClosingBrace(position)) {
@@ -192,15 +248,15 @@ export class StructureValidator {
       this.addIssue({
         type: 'error',
         pattern: 'MISPLACED_COMMA',
-        line: lineInfo.line,
-        column: lineInfo.column,
+        line: finalLineInfo.line,
+        column: finalLineInfo.column,
         message: 'Comma in wrong position',
-        originalText: this.getLineText(lineInfo.line),
+        originalText: this.getLineText(finalLineInfo.line),
         suggestedFix: 'Remove or relocate comma',
         canAutoFix: true,
         evidence: {
           observed: token,
-          context: 'Comma not expected in this context',
+          context: this.getContextAroundPosition(position, 40),
           ruleViolated: 'RFC 7159 Structural Grammar'
         }
       })
@@ -208,23 +264,23 @@ export class StructureValidator {
       this.addIssue({
         type: 'error',
         pattern: 'UNEXPECTED_TOKEN',
-        line: lineInfo.line,
-        column: lineInfo.column,
+        line: finalLineInfo.line,
+        column: finalLineInfo.column,
         message: `Unexpected ${token}`,
-        originalText: this.getLineText(lineInfo.line),
+        originalText: this.getLineText(finalLineInfo.line),
         suggestedFix: `Remove or correct ${token}`,
         canAutoFix: false,
         evidence: {
           observed: token,
-          context: this.getContextAroundPosition(position),
+          context: this.getContextAroundPosition(position, 40),
           ruleViolated: 'RFC 7159 Token Grammar'
         }
       })
     }
   }
 
-  private detectUnexpectedEnd(position: number): void {
-    const lineInfo = this.getLineAndColumn(position)
+  private detectUnexpectedEnd(position: number, lineInfo?: { line: number; column: number }): void {
+    const finalLineInfo = lineInfo || this.getLineAndColumn(position)
     
     // Check for unclosed structures
     const openBraces = (this.content.match(/\{/g) || []).length
@@ -246,8 +302,8 @@ export class StructureValidator {
     this.addIssue({
       type: 'error',
       pattern: 'UNEXPECTED_END',
-      line: lineInfo.line,
-      column: lineInfo.column,
+      line: finalLineInfo.line,
+      column: finalLineInfo.column,
       message: 'Unexpected end of input',
       originalText: this.content.slice(-50), // Last 50 chars
       suggestedFix: suggestion,
@@ -260,21 +316,35 @@ export class StructureValidator {
     })
   }
 
-  private detectMissingComma(position: number): void {
-    const lineInfo = this.getLineAndColumn(position)
+  private detectMissingComma(position: number, lineInfo?: { line: number; column: number }): void {
+    const finalLineInfo = lineInfo || this.getLineAndColumn(position)
+    
+    // For missing comma, the error is usually reported at the NEXT property
+    // But the fix is needed at the PREVIOUS line. Try to find the previous property line.
+    let fixLine = finalLineInfo.line
+    let fixColumn = finalLineInfo.column
+    
+    // Check if previous line ends with a value (no comma)
+    if (finalLineInfo.line > 1) {
+      const prevLine = this.getLineText(finalLineInfo.line - 1)
+      if (prevLine && !prevLine.trim().endsWith(',') && !prevLine.trim().endsWith('{') && !prevLine.trim().endsWith('[')) {
+        fixLine = finalLineInfo.line - 1
+        fixColumn = prevLine.length
+      }
+    }
     
     this.addIssue({
       type: 'error',
       pattern: 'MISSING_COMMA',
-      line: lineInfo.line,
-      column: lineInfo.column,
-      message: 'Missing comma between properties',
-      originalText: this.getLineText(lineInfo.line),
-      suggestedFix: 'Add comma after previous property',
+      line: fixLine,
+      column: fixColumn,
+      message: 'Missing comma after property value',
+      originalText: this.getLineText(fixLine),
+      suggestedFix: 'Add comma after the value',
       canAutoFix: true,
       evidence: {
-        observed: 'String without comma',
-        context: 'Object properties must be separated by commas',
+        observed: 'Property without trailing comma',
+        context: `Missing comma before line ${finalLineInfo.line}`,
         ruleViolated: 'RFC 7159 Object Grammar'
       }
     })

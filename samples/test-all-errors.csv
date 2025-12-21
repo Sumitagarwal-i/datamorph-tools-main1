@@ -1,0 +1,13 @@
+id,name,age,salary,email,status,hire_date,end_date
+1,John Doe,28,55000,john@example.com,active,2020-01-15,2025-12-31
+2,Jane Smith,32,62000,jane@example.com,active,2019-03-20,2026-01-15
+3,Bob Johnson,twenty-five,58000,bob@example.com,inactive,2021-06-10,2024-12-31
+FOUR,Alice Williams,29,60000,alice@example.com,active,2020-11-05,2025-06-30
+5,Charlie Brown,-5,999999,charlie@example.com,unknown,2030-01-01,2018-12-31
+5,David Lee,35,sixty-five thousand,david@example.com,active,1850-01-01,2026-03-15
+7,Emma Wilson,,0,,pending,,
+8,Frank Miller,150,-50000,frank@example.com,active,2022-05-20,2022-05-19
+9,Grace Davis,30,57000,grace@example.com
+10,Henry Martinez,27,54000,henry@example.com,active,2021-02-10,2026-02-10
+11,"Unbalanced Quote,35,45000,unbalanced@example.com,active,2021-01-01,2022-01-01
+12,Extra,30,50000,extra@example.com,active,2021-01-01,2022-01-01,EXTRA_COL
