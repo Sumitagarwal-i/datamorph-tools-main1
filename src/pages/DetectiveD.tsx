@@ -160,6 +160,10 @@ const DetectiveD = () => {
   const [stayConnectedEmail, setStayConnectedEmail] = useState("");
   const [stayConnectedOptIn, setStayConnectedOptIn] = useState(false);
   
+  // Mobile responsive panel states
+  const [showErrorPanel, setShowErrorPanel] = useState(false);
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
+  
   // Store errors and structure issues per file ID for persistence
   const fileErrorsRef = useRef<Map<string, ErrorItem[]>>(new Map());
   const fileStructureIssuesRef = useRef<Map<string, StructureIssue[]>>(new Map());
@@ -1435,12 +1439,12 @@ const DetectiveD = () => {
                     onClick={runAnalysis}
                     disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
                     size="sm"
-                    className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all px-4 py-2 font-medium"
+                    className="gap-1 sm:gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all px-3 sm:px-4 py-2 font-medium"
                   >
                     {isAnalyzing ? (
                       <>
                         <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs font-medium">Analyzing...</span>
+                        <span className="text-xs font-medium hidden sm:inline">Analyzing...</span>
                       </>
                     ) : (
                       <>
@@ -1457,6 +1461,21 @@ const DetectiveD = () => {
               </Tooltip>
             )}
 
+            {/* Mobile: Issues toggle button - show on mobile only */}
+            {activeFile && (
+              <button
+                onClick={() => setShowErrorPanel(!showErrorPanel)}
+                className="lg:hidden p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center w-9 h-9 relative"
+              >
+                <AlertCircle className="h-4 w-4" />
+                {(structureIssues.length + errors.length) > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                    {structureIssues.length + errors.length}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* Upload File Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1467,7 +1486,7 @@ const DetectiveD = () => {
                   className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 gap-1 px-2"
                 >
                   <Upload className="h-4 w-4" />
-                  <span className="text-xs font-medium">Upload</span>
+                  <span className="text-xs font-medium hidden sm:inline">Upload</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Upload File</TooltipContent>
@@ -1517,22 +1536,21 @@ const DetectiveD = () => {
               <TooltipTrigger asChild>
                 <button
                   onClick={() => setFeedbackModalOpen(true)}
-                  className="p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center min-w-[44px] h-9 gap-2"
-                  style={{ minWidth: '110px' }}
+                  className="p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center h-9 gap-2 min-w-[44px] sm:min-w-[110px]"
                 >
                   <MessageSquare className="h-4 w-4" />
-                  <span className="text-xs font-semibold">Feedback</span>
+                  <span className="text-xs font-semibold hidden sm:inline">Feedback</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Send Feedback</TooltipContent>
             </Tooltip>
 
-            {/* Stay Connected Button */}
+            {/* Stay Connected Button - hide on mobile */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={() => setStayConnectedModalOpen(true)}
-                  className="p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center w-9 h-9"
+                  className="hidden sm:flex p-2 rounded-full border border-slate-700 hover:border-slate-600 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-slate-200 items-center justify-center w-9 h-9"
                 >
                   <Bell className="h-4 w-4" />
                 </button>
@@ -1556,16 +1574,16 @@ const DetectiveD = () => {
         </div>
       </nav>
 
-      {/* File Tabs Bar (Horizontal) */}
+      {/* File Tabs Bar (Horizontal) - scrollable on mobile */}
       {uploadedFiles.length > 0 && (
-        <div className="border-b border-slate-800 bg-[#0d0f13] flex items-center overflow-x-auto">
+        <div className="border-b border-slate-800 bg-[#0d0f13] flex items-center overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
           {uploadedFiles.map((file) => (
             <button
               key={file.id}
               onClick={() => setActiveFileId(file.id)}
               className={`
-                flex items-center gap-2 px-3 py-1.5 text-sm border-r border-slate-800 whitespace-nowrap !rounded-none
-                transition-colors group relative
+                flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm border-r border-slate-800 whitespace-nowrap !rounded-none
+                transition-colors group relative flex-shrink-0
                 ${activeFileId === file.id 
                   ? 'bg-slate-800/50 text-slate-100' 
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
@@ -1573,10 +1591,10 @@ const DetectiveD = () => {
               `}
             >
               {getFileIcon(file.name)}
-              <span className="max-w-[150px] truncate">{file.name}</span>
+              <span className="max-w-[100px] sm:max-w-[150px] truncate">{file.name}</span>
               <button
                 onClick={(e) => closeFile(file.id, e)}
-                className="opacity-0 group-hover:opacity-100 hover:bg-slate-700 rounded-none p-0.5 transition-opacity"
+                className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-slate-700 rounded-none p-0.5 transition-opacity"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -1586,7 +1604,7 @@ const DetectiveD = () => {
             <TooltipTrigger asChild>
               <button
                 onClick={handleFileUpload}
-                className="flex items-center gap-1 px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors !rounded-none"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors !rounded-none flex-shrink-0"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -1596,15 +1614,25 @@ const DetectiveD = () => {
         </div>
       )}
 
-      {/* Main Content Area - 3 Column Grid */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[280px_1fr_350px] gap-0 overflow-hidden">
-        {/* Left Panel - Error List Sidebar */}
-        <div className="border-r border-[#1C1F22] bg-[#111315] overflow-y-auto">
-          {/* Header */}
-          <div className="px-3 py-3 border-b border-[#1C1F22]">
+      {/* Main Content Area - Responsive Layout */}
+      <main className="flex-1 flex flex-col lg:grid lg:grid-cols-[280px_1fr_350px] gap-0 overflow-hidden relative">
+        {/* Left Panel - Error List Sidebar - Mobile: Slide-over, Desktop: Fixed */}
+        <div className={`
+          lg:border-r border-[#1C1F22] bg-[#111315] overflow-y-auto
+          lg:relative fixed inset-y-0 left-0 z-40 w-[280px] transform transition-transform duration-300
+          ${showErrorPanel ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
+          {/* Header with close button for mobile */}
+          <div className="px-3 py-3 border-b border-[#1C1F22] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#E6E7E9]">
               Issues ({structureIssues.length + errors.length})
             </h2>
+            <button
+              onClick={() => setShowErrorPanel(false)}
+              className="lg:hidden p-1 hover:bg-slate-800 rounded"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
           
           {/* Error Items */}
@@ -1743,31 +1771,39 @@ const DetectiveD = () => {
           )}
         </div>
 
-        {/* Middle Panel - Code Editor */}
-        <div className="border-x border-[#1B1E21] bg-[#0F1113] flex flex-col">
+        {/* Mobile overlay backdrop for error panel */}
+        {showErrorPanel && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/60 z-30"
+            onClick={() => setShowErrorPanel(false)}
+          />
+        )}
+
+        {/* Middle Panel - Code Editor - takes full width on mobile */}
+        <div className="border-x border-[#1B1E21] bg-[#0F1113] flex flex-col flex-1 lg:flex-none">
           {activeFile ? (
             <>
               {/* Top Toolbar */}
-              <div className="h-10 border-b border-[#1C1F22] bg-[#0F1113] flex items-center justify-between px-3">
+              <div className="h-10 border-b border-[#1C1F22] bg-[#0F1113] flex items-center justify-between px-2 sm:px-3 overflow-x-auto">
                 {/* Left: File Info */}
-                <div className="flex items-center gap-3 text-xs text-[#7A7F86]">
+                <div className="flex items-center gap-2 sm:gap-3 text-xs text-[#7A7F86] whitespace-nowrap">
                   <span className="font-medium text-[#D0D3D8]">{getFileType(activeFile.name)}</span>
-                  <span>•</span>
-                  <span>Lines: {getLineCount(editorContent)}</span>
-                  <span>•</span>
-                  <span>Chars: {editorContent.length}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="hidden sm:inline">Lines: {getLineCount(editorContent)}</span>
+                  <span className="hidden md:inline">•</span>
+                  <span className="hidden md:inline">Chars: {editorContent.length}</span>
                 </div>
                 
-                {/* Right: Action Buttons */}
-                <div className="flex items-center gap-2">
+                {/* Right: Action Buttons - responsive */}
+                <div className="flex items-center gap-1 sm:gap-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => setViewMode('table')}
-                        className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
+                        className={`rounded px-1.5 sm:px-2.5 py-1 text-xs flex items-center gap-1 sm:gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
                       >
                         <Table className="h-3 w-3" strokeWidth={2} />
-                        Table
+                        <span className="hidden sm:inline">Table</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Table view</TooltipContent>
@@ -1776,10 +1812,10 @@ const DetectiveD = () => {
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => setViewMode('text')}
-                        className={`rounded px-2.5 py-1 text-xs flex items-center gap-1.5 transition-colors ${viewMode === 'text' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
+                        className={`rounded px-1.5 sm:px-2.5 py-1 text-xs flex items-center gap-1 sm:gap-1.5 transition-colors ${viewMode === 'text' ? 'bg-[#1A1D20] text-[#D0D3D8]' : 'text-[#D0D3D8] hover:bg-[#1A1D20]'}`}
                       >
                         <AlignLeft className="h-3 w-3" strokeWidth={2} />
-                        Text
+                        <span className="hidden sm:inline">Text</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Text view</TooltipContent>
@@ -1788,10 +1824,10 @@ const DetectiveD = () => {
                     <TooltipTrigger asChild>
                       <button
                         onClick={handleBeautify}
-                        className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
+                        className="rounded px-1.5 sm:px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1 sm:gap-1.5"
                       >
                         <Wand2 className="h-3 w-3" strokeWidth={2} />
-                        Pretty Print
+                        <span className="hidden md:inline">Pretty Print</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Format / Beautify</TooltipContent>
@@ -1800,10 +1836,10 @@ const DetectiveD = () => {
                     <TooltipTrigger asChild>
                       <button
                         onClick={handleMinify}
-                        className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
+                        className="rounded px-1.5 sm:px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1 sm:gap-1.5"
                       >
                         <Minimize2 className="h-3 w-3" strokeWidth={2} />
-                        Minify
+                        <span className="hidden md:inline">Minify</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Minify</TooltipContent>
@@ -1812,10 +1848,10 @@ const DetectiveD = () => {
                     <TooltipTrigger asChild>
                       <button
                         onClick={handleDownload}
-                        className="rounded px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1.5"
+                        className="rounded px-1.5 sm:px-2.5 py-1 text-xs text-[#D0D3D8] hover:bg-[#1A1D20] transition-colors flex items-center gap-1 sm:gap-1.5"
                       >
                         <Download className="h-3 w-3" strokeWidth={2} />
-                        Download
+                        <span className="hidden sm:inline">Download</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Download</TooltipContent>
@@ -1823,15 +1859,15 @@ const DetectiveD = () => {
                 </div>
               </div>
 
-              {/* Error Summary Panel (A4) */}
+              {/* Error Summary Panel (A4) - responsive */}
               {activeFile && (
                 <div 
                   onClick={handleSummaryClick}
-                  className="h-9 border-b border-[#1C1F22] bg-[#0F1113] flex items-center px-3 cursor-pointer hover:bg-[#151719] transition-colors"
+                  className="h-9 border-b border-[#1C1F22] bg-[#0F1113] flex items-center px-2 sm:px-3 cursor-pointer hover:bg-[#151719] transition-colors overflow-x-auto"
                 >
-                  <div className="flex items-center gap-4 text-xs text-[#7A7F86]">
+                  <div className="flex items-center gap-2 sm:gap-4 text-xs text-[#7A7F86] whitespace-nowrap">
                     {/* Error count */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <span className="w-1.5 h-1.5 rounded-full" style={{
                         backgroundColor: errors.length > 0 ? (errors.some(e => e.type === 'error') ? '#FF4D4D' : '#EAB308') : '#4EC9B0'
                       }}></span>
@@ -1844,7 +1880,7 @@ const DetectiveD = () => {
                     </div>
 
                     {/* Warning count */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <span className="text-[#7A7F86]">•</span>
                       <span>
                         <span className="text-[#D0D3D8] font-medium">
@@ -1854,16 +1890,16 @@ const DetectiveD = () => {
                       </span>
                     </div>
 
-                    {/* Analysis mode */}
-                    <div className="flex items-center gap-2">
+                    {/* Analysis mode - hide on mobile */}
+                    <div className="hidden sm:flex items-center gap-2">
                       <span className="text-[#7A7F86]">•</span>
                       <span className="text-slate-300">
                         Deterministic Validation
                       </span>
                     </div>
 
-                    {/* Last updated */}
-                    <div className="flex items-center gap-2 ml-auto">
+                    {/* Last updated - hide on mobile */}
+                    <div className="hidden md:flex items-center gap-2 ml-auto">
                       <span className="text-[#7A7F86]">•</span>
                       <span>Updated {getTimeAgoText(lastValidationTime)}</span>
                     </div>
@@ -1982,8 +2018,28 @@ const DetectiveD = () => {
           )}
         </div>
 
-        {/* Right Panel - Error Details Analysis */}
-        <div className="right-panel border-l border-[#1C1F22] bg-[#101113] overflow-y-auto">
+        {/* Right Panel - Error Details Analysis - Mobile: Full-screen overlay, Desktop: Fixed */}
+        <div className={`
+          right-panel border-l border-[#1C1F22] bg-[#101113] overflow-y-auto
+          lg:relative fixed inset-0 z-50 lg:z-auto transform transition-transform duration-300
+          ${(selectedErrorId || selectedStructureIssue) ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+        `}>
+          {/* Mobile: Header with back button */}
+          {(selectedErrorId || selectedStructureIssue) && (
+            <div className="lg:hidden px-4 py-3 border-b border-[#1C1F22] flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setSelectedErrorId(null);
+                  setSelectedStructureIssue(null);
+                }}
+                className="p-2 hover:bg-slate-800 rounded"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <h2 className="text-sm font-semibold text-[#E6E7E9]">Issue Details</h2>
+            </div>
+          )}
+          
           {(selectedErrorId || selectedStructureIssue) && activeFile ? (
             (() => {
               // Handle structure issues
