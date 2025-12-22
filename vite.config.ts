@@ -56,7 +56,6 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('@tanstack/react-query')) return 'react-query';
             if (id.includes('papaparse')) return 'csv-parser';
             if (id.includes('@supabase')) return 'supabase';
-            if (id.includes('sonner') || id.includes('next-themes')) return 'ui-libs';
             return 'vendor';
           }
           // App chunks
