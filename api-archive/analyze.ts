@@ -4,16 +4,16 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { rateLimiter } from './_lib/rateLimiter.js';
-import { requestValidator, handleValidationError } from './_lib/requestValidator.js';
-import { logger, Logger } from './_lib/logger.js';
-import { retrieveRAGSnippets, formatRAGSnippetsForPrompt, getRAGStatus } from './_lib/ragGrounding.js';
-import { callLLM, getProviderInfo } from './_lib/llmProvider.js';
+import { rateLimiter } from './archive/_lib/rateLimiter.js';
+import { requestValidator, handleValidationError } from './archive/_lib/requestValidator.js';
+import { logger, Logger } from './archive/_lib/logger.js';
+import { retrieveRAGSnippets, formatRAGSnippetsForPrompt, getRAGStatus } from './archive/_lib/ragGrounding.js';
+import { callLLM, getProviderInfo } from './archive/_lib/llmProvider.js';
 import { randomUUID } from 'crypto';
 import { parse as parseCsv } from 'csv-parse/sync';
 import * as yaml from 'js-yaml';
-import { getCachedAnalysis, cacheAnalysisResult, computeContentHash } from './_lib/cacheManager.js';
-import { logTelemetryAsync } from './_lib/telemetryLogger.js';
+import { getCachedAnalysis, cacheAnalysisResult, computeContentHash } from './archive/_lib/cacheManager.js';
+import { logTelemetryAsync } from './archive/_lib/telemetryLogger.js';
 import { buildChunkList, type Chunk } from './_lib/chunkProcessor.js';
 import { aggregateChunkErrors, type AggregationResult } from './_lib/errorAggregator.js';
 
