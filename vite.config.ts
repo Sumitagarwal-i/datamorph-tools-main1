@@ -30,15 +30,6 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ["console.log", "console.info", "console.warn"],
-        passes: 3,
-        toplevel: true,
-      },
-      mangle: {
-        safari10: true,
-        properties: {
-          regex: /^_/
-        }
       },
       format: {
         comments: false,
@@ -47,18 +38,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Vendor chunk for core dependencies
-          if (id.includes('node_modules')) {
-            if (id.includes('@monaco-editor')) return 'monaco';
-            // do not create a separate radix-ui chunk to avoid circular init issues
-            if (id.includes('react') || id.includes('react-dom')) return 'react';
-            if (id.includes('react-router-dom')) return 'router';
-            if (id.includes('@tanstack/react-query')) return 'react-query';
-            if (id.includes('papaparse')) return 'csv-parser';
-            if (id.includes('@supabase')) return 'supabase';
-            return 'vendor';
-          }
-          // App chunks
+          // Only chunk your own code, not libraries!
           if (id.includes('src/pages')) return 'pages';
           if (id.includes('src/components') && !id.includes('ui/')) return 'components';
           if (id.includes('src/lib')) return 'lib';
