@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => ({
           // Vendor chunk for core dependencies
           if (id.includes('node_modules')) {
             if (id.includes('@monaco-editor')) return 'monaco';
-            if (id.includes('@radix-ui')) return 'radix-ui';
+            // do not create a separate radix-ui chunk to avoid circular init issues
             if (id.includes('react') || id.includes('react-dom')) return 'react';
             if (id.includes('react-router-dom')) return 'router';
             if (id.includes('@tanstack/react-query')) return 'react-query';
