@@ -51,7 +51,7 @@ export function initializeRAG(): void {
     });
   } catch (error) {
     ragLoadError = `Failed to load RAG specs: ${error}`;
-    logger.error('RAG initialization error', { message: String(error) });
+    logger.error('RAG initialization error', error as Error);
   }
 }
 
