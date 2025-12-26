@@ -1618,7 +1618,7 @@ const DetectiveD = () => {
       <main className="flex-1 flex flex-col lg:grid lg:grid-cols-[280px_1fr_350px] gap-0 overflow-hidden relative">
         {/* Left Panel - Error List Sidebar - Mobile: Slide-over, Desktop: Fixed */}
         <div className={`
-          lg:border-r border-[#1C1F22] bg-[#111315] overflow-y-auto
+          lg:border-r border-[#1C1F22] bg-[#111315] flex flex-col h-full overflow-hidden
           lg:relative fixed inset-y-0 left-0 z-40 w-[280px] transform transition-transform duration-300
           ${showErrorPanel ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
@@ -1634,8 +1634,9 @@ const DetectiveD = () => {
               <X className="h-4 w-4" />
             </button>
           </div>
-          
-          {/* Error Items */}
+
+          {/* Scrollable Error Items */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
           {isAnalyzing ? (
             <div className="px-3 py-16 text-center space-y-4">
               <div className="flex justify-center">
@@ -1769,6 +1770,14 @@ const DetectiveD = () => {
                 </div>
             </div>
           )}
+          </div>
+
+          {/* Persistent Helper Note */}
+          <div className="flex-shrink-0 border-t border-[#23262A] bg-[#151719] px-4 py-3">
+            <div className="text-xs text-[#7A7F86] text-center leading-relaxed">
+              <div className="mb-1 font-medium">Errors are revealed progressively - fix the current issues to uncover more.</div>
+            </div>
+          </div>
         </div>
 
         {/* Mobile overlay backdrop for error panel */}
