@@ -6,6 +6,8 @@ import { ShareModal } from "@/components/ShareModal";
 import { AuditLogModal } from "@/components/AuditLogModal";
 import { ExportModal } from "@/components/ExportModal";
 import { useState, useRef, useEffect, useMemo } from "react";
+import { trackEvent } from "@/hooks/useTelemetry";
+import FeedbackPopup from '@/components/FeedbackPopup';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Editor from "@monaco-editor/react";
@@ -132,6 +134,7 @@ const DetectiveD = () => {
   const [errors, setErrors] = useState<ErrorItem[]>([]);
   const [lastValidationTime, setLastValidationTime] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
   const [structureIssues, setStructureIssues] = useState<StructureIssue[]>([]);
   const [hasStructureErrors, setHasStructureErrors] = useState(false);
   const [isFixingStructure, setIsFixingStructure] = useState(false);
@@ -217,6 +220,13 @@ const DetectiveD = () => {
         
         setUploadedFiles(prev => [...prev, newFile]);
         setActiveFileId(newFile.id);
+        // Telemetry: file uploaded
+        try {
+          trackEvent('file_upload', {
+            file_name: newFile.name,
+            content_length: newFile.content.length,
+          });
+        } catch (e) {}
         
         // Automatically validate structure on upload
         validateFileStructure(content, file.name);
@@ -338,8 +348,10 @@ const DetectiveD = () => {
       return;
     }
 
+    const analysisStartedAt = Date.now();
     try {
       setIsAnalyzing(true);
+      trackEvent('analysis_start', { file_name: activeFile?.name, file_type: fileType, content_length: editorContent.length });
       
       // Run Detective D engine
       const engine = new DetectiveDEngine(editorContent, activeFile.name);
@@ -348,6 +360,7 @@ const DetectiveD = () => {
       // Convert findings to ErrorItem for display
       const displayItems: ErrorItem[] = findings.map(finding => ({
         id: finding.id,
+          <FeedbackPopup fileName={activeFile?.name} fileType={activeFile?.name.split('.').pop()} onClose={() => setShowFeedbackPopup(false)} />
         line: finding.location.row || 1, // Display line number (derived from offset)
         column: finding.location.column ? Number(finding.location.column) : undefined,
         startOffset: finding.location.startOffset, // Primary reference for highlighting
@@ -368,6 +381,15 @@ const DetectiveD = () => {
       }));
       
       setErrors(displayItems);
+      // Telemetry: analysis complete
+      try {
+        trackEvent('analysis_complete', {
+          file_name: activeFile?.name,
+          file_type: fileType,
+          total_errors: displayItems.length,
+          latency_ms: Date.now() - analysisStartedAt,
+        });
+      } catch (e) {}
       if (activeFile) {
         fileErrorsRef.current.set(activeFile.id, displayItems);
         fileAnalyzedRef.current.set(activeFile.id, true);
@@ -384,11 +406,15 @@ const DetectiveD = () => {
           description: `Found ${displayItems.length} issue${displayItems.length !== 1 ? 's' : ''} in ${activeFile.name}`,
           duration: 3000
         });
+        // Show feedback popup for successful analysis (non-blocking)
+        setShowFeedbackPopup(true);
       } else {
         toast.success('Analysis complete', {
           description: 'No issues found! Data looks good.',
           duration: 3000
         });
+        // Also prompt for feedback on clean results
+        setShowFeedbackPopup(true);
       }
       
       if (selectedErrorId && !displayItems.find(e => e.id === selectedErrorId)) {
@@ -399,6 +425,7 @@ const DetectiveD = () => {
       }
     } catch (err) {
       console.error('[Detective D] Analysis error:', err);
+      try { trackEvent('analysis_failed', { file_name: activeFile?.name, file_type: fileType, message: String(err) }); } catch(e) {}
       toast.error('Analysis failed', {
         description: 'Detective D encountered an error during analysis',
         duration: 4000
@@ -1133,6 +1160,7 @@ const DetectiveD = () => {
       if (activeFile.name.endsWith('.json')) {
         const formatted = JSON.stringify(JSON.parse(editorContent), null, 2);
         setEditorContent(formatted);
+        try { trackEvent('beautify', { file_name: activeFile.name }); } catch(e) {}
       }
     } catch (e) {
       console.error('Beautify failed:', e);
@@ -1146,6 +1174,7 @@ const DetectiveD = () => {
       if (activeFile.name.endsWith('.json')) {
         const minified = JSON.stringify(JSON.parse(editorContent));
         setEditorContent(minified);
+        try { trackEvent('minify', { file_name: activeFile.name }); } catch(e) {}
       }
     } catch (e) {
       console.error('Minify failed:', e);
@@ -1162,6 +1191,7 @@ const DetectiveD = () => {
     a.download = activeFile.name;
     a.click();
     URL.revokeObjectURL(url);
+    try { trackEvent('download', { file_name: activeFile.name, content_length: editorContent.length }); } catch(e) {}
   };
 
   // Apply error highlights to editor using character offsets for precise highlighting
@@ -1336,6 +1366,16 @@ const DetectiveD = () => {
         editor.revealLineInCenter(selectedError.line);
         editor.setPosition({ lineNumber: selectedError.line, column: selectedError.column || 1 });
       }
+    }
+  }, [selectedErrorId]);
+
+  // Track when a user selects an error (for analytics)
+  useEffect(() => {
+    if (selectedErrorId) {
+      const selected = errors.find(e => e.id === selectedErrorId);
+      try {
+        trackEvent('select_error', { error_id: selectedErrorId, message: selected?.message, file_name: activeFile?.name });
+      } catch (e) {}
     }
   }, [selectedErrorId]);
 
