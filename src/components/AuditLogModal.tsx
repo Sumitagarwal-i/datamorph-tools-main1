@@ -289,54 +289,55 @@ export const AuditLogModal = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-slate-950 border border-slate-800 rounded-lg shadow-xl max-w-sm w-full">
+      <div className="mx-auto bg-[#1F2326] border border-[#2B2F33] rounded-md shadow-2xl text-sm text-[#D1D5DB] max-w-sm w-full">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h2 className="text-lg font-semibold text-slate-100">Download Audit Log</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2B2F33]">
+          <h2 className="text-lg font-semibold text-[#D1D5DB]">Download Audit Log</h2>
           <button
             onClick={() => onOpenChange(false)}
-            className="text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-[#94A3B8] hover:text-[#D1D5DB] transition-colors"
+            aria-label="Close audit modal"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4">
           {/* Summary */}
-          <div className="bg-slate-900 border border-slate-800 rounded p-4 space-y-2 text-sm">
+          <div className="bg-[#26292C] border border-[#2B2F33] rounded p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-400">File</span>
-              <span className="text-slate-100 font-medium">{fileName}</span>
+              <span className="text-[#9CA3AF]">File</span>
+              <span className="text-[#D1D5DB] font-medium">{fileName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Total Issues</span>
-              <span className="text-slate-100 font-medium">{issueCount}</span>
+              <span className="text-[#9CA3AF]">Total Issues</span>
+              <span className="text-[#D1D5DB] font-medium">{issueCount}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Errors</span>
+              <span className="text-[#9CA3AF]">Errors</span>
               <span className="text-red-400 font-medium">{errorCount}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Warnings</span>
+              <span className="text-[#9CA3AF]">Warnings</span>
               <span className="text-yellow-400 font-medium">{warningCount}</span>
             </div>
-            <div className="flex justify-between text-xs pt-2 border-t border-slate-800">
-              <span className="text-slate-500">Timestamp</span>
-              <span className="text-slate-400">{new Date().toLocaleString()}</span>
+            <div className="flex justify-between text-xs pt-2 border-t border-[#2B2F33]">
+              <span className="text-[#9CA3AF]">Timestamp</span>
+              <span className="text-[#9CA3AF]">{new Date().toLocaleString()}</span>
             </div>
           </div>
 
           {/* Format Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-100">Export Format</label>
+            <label className="text-sm font-medium text-[#D1D5DB]">Export Format</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setFormat('json')}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors ${
                   format === 'json'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    ? 'bg-[#2B3840] text-[#D1D5DB] border border-[#37474F]'
+                    : 'bg-[#26292C] text-[#C7CED6] hover:bg-[#2B2F33]'
                 }`}
               >
                 <FileJson className="h-4 w-4" />
@@ -346,8 +347,8 @@ export const AuditLogModal = ({
                 onClick={() => setFormat('csv')}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors ${
                   format === 'csv'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    ? 'bg-[#2B3840] text-[#D1D5DB] border border-[#37474F]'
+                    : 'bg-[#26292C] text-[#C7CED6] hover:bg-[#2B2F33]'
                 }`}
               >
                 <FileText className="h-4 w-4" />
@@ -357,8 +358,8 @@ export const AuditLogModal = ({
                 onClick={() => setFormat('pdf')}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors ${
                   format === 'pdf'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    ? 'bg-[#2B3840] text-[#D1D5DB] border border-[#37474F]'
+                    : 'bg-[#26292C] text-[#C7CED6] hover:bg-[#2B2F33]'
                 }`}
               >
                 <FileText className="h-4 w-4" />
@@ -370,14 +371,14 @@ export const AuditLogModal = ({
           {/* Download Button */}
           <button
             onClick={generateAuditLog}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-primary/90 rounded text-primary-foreground font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#3B82F6] hover:bg-[#2563EB] rounded text-white font-medium transition-colors"
           >
             <Download className="h-4 w-4" />
             Download Audit Log
           </button>
 
           {/* Branding Footer */}
-          <div className="pt-3 border-t border-slate-800 text-center text-xs text-slate-500 space-y-1">
+          <div className="pt-3 border-t border-[#2B2F33] text-center text-xs text-[#9CA3AF] space-y-1">
             <p>DatumInt • Detective D Analysis</p>
             <p>Professional Data Quality Auditing</p>
           </div>

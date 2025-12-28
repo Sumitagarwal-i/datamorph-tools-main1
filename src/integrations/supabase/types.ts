@@ -83,6 +83,36 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_feedbacks: {
+        Row: {
+          id: string
+          created_at: string
+          file_name: string | null
+          main_answer: string | null
+          follow_up: string | null
+          free_text: string | null
+          use_case: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          file_name?: string | null
+          main_answer?: string | null
+          follow_up?: string | null
+          free_text?: string | null
+          use_case?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          file_name?: string | null
+          main_answer?: string | null
+          follow_up?: string | null
+          free_text?: string | null
+          use_case?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -112,7 +142,7 @@ export type Tables<
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

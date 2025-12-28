@@ -7,7 +7,7 @@ import { AuditLogModal } from "@/components/AuditLogModal";
 import { ExportModal } from "@/components/ExportModal";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { trackEvent } from "@/hooks/useTelemetry";
-import FeedbackPopup from '@/components/FeedbackPopup';
+import { FeedbackPopup } from '@/components/FeedbackPopup';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Editor from "@monaco-editor/react";
@@ -26,6 +26,7 @@ import {
 import { useTheme } from "next-themes";
 import { DetectiveD as DetectiveDEngine, DetectiveFinding } from "@/lib/detectiveD";
 import { StructureValidator, StructureIssue, StructureValidationResult } from "@/lib/structureValidator";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UploadedFile {
   id: string;
@@ -172,6 +173,22 @@ const DetectiveD = () => {
   const fileStructureIssuesRef = useRef<Map<string, StructureIssue[]>>(new Map());
   const fileAnalyzedRef = useRef<Map<string, boolean>>(new Map());
   const fileOriginalContentRef = useRef<Map<string, string>>(new Map());
+
+  // Show feedback popup once per browser session (avoid repeated annoyance)
+  const triggerFeedbackPopupOnce = () => {
+    try {
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('detective_feedback_shown')) {
+        return;
+      }
+      setShowFeedbackPopup(true);
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('detective_feedback_shown', '1');
+      }
+    } catch (err) {
+      // ignore storage errors
+      setShowFeedbackPopup(true);
+    }
+  };
 
   // Detective D is now public - no passcode required
 
@@ -360,7 +377,6 @@ const DetectiveD = () => {
       // Convert findings to ErrorItem for display
       const displayItems: ErrorItem[] = findings.map(finding => ({
         id: finding.id,
-          <FeedbackPopup fileName={activeFile?.name} fileType={activeFile?.name.split('.').pop()} onClose={() => setShowFeedbackPopup(false)} />
         line: finding.location.row || 1, // Display line number (derived from offset)
         column: finding.location.column ? Number(finding.location.column) : undefined,
         startOffset: finding.location.startOffset, // Primary reference for highlighting
@@ -400,21 +416,21 @@ const DetectiveD = () => {
       setIsEditMode(false); // Clear edit mode after successful analysis
       setLastValidationTime(Date.now());
       
-      // Show feedback toast
-      if (displayItems.length > 0) {
+        // Show feedback toast
+        if (displayItems.length > 0) {
         toast.info('Analysis complete', {
           description: `Found ${displayItems.length} issue${displayItems.length !== 1 ? 's' : ''} in ${activeFile.name}`,
           duration: 3000
         });
-        // Show feedback popup for successful analysis (non-blocking)
-        setShowFeedbackPopup(true);
+          // Show feedback popup for successful analysis (non-blocking)
+          triggerFeedbackPopupOnce();
       } else {
         toast.success('Analysis complete', {
           description: 'No issues found! Data looks good.',
           duration: 3000
         });
-        // Also prompt for feedback on clean results
-        setShowFeedbackPopup(true);
+          // Also prompt for feedback on clean results
+          triggerFeedbackPopupOnce();
       }
       
       if (selectedErrorId && !displayItems.find(e => e.id === selectedErrorId)) {
@@ -954,6 +970,7 @@ const DetectiveD = () => {
     return { color: 'text-gray-400 bg-gray-500/20 border-gray-500/30', label: category };
   };
 
+  // GetSuggestions: add pretty print suggestion for indentation errors
   const getSuggestions = (error: ErrorItem, fileName: string): string[] => {
     const extension = fileName.split('.').pop()?.toLowerCase();
     const suggestions: string[] = [];
@@ -968,6 +985,8 @@ const DetectiveD = () => {
       } else if (error.message.includes('Unexpected string')) {
         suggestions.push('Add a comma before this property');
         suggestions.push('Remove extra quotes if present');
+      } else if (error.message.toLowerCase().includes('indent') || error.message.toLowerCase().includes('indentation')) {
+        suggestions.push('Indentation error detected. Use the Pretty Print action to auto-fix indentation.');
       } else {
         suggestions.push('Review the syntax at the indicated line');
         suggestions.push('Use a JSON validator to identify the exact issue');
@@ -1154,13 +1173,16 @@ const DetectiveD = () => {
   }, [activeFile, editorContent]);
 
   // Format/Beautify content
-  const handleBeautify = () => {
+  const handleBeautify = async () => {
     if (!activeFile) return;
     try {
       if (activeFile.name.endsWith('.json')) {
         const formatted = JSON.stringify(JSON.parse(editorContent), null, 2);
         setEditorContent(formatted);
         try { trackEvent('beautify', { file_name: activeFile.name }); } catch(e) {}
+        // After beautify, re-validate structure and re-run analysis
+        await validateFileStructure(formatted, activeFile.name);
+        await runAnalysis();
       }
     } catch (e) {
       console.error('Beautify failed:', e);
@@ -2083,7 +2105,7 @@ const DetectiveD = () => {
                 }}
                 className="p-2 hover:bg-slate-800 rounded"
               >
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5 text-gray-500" />
               </button>
               <h2 className="text-sm font-semibold text-[#E6E7E9]">Issue Details</h2>
             </div>
@@ -2236,7 +2258,7 @@ const DetectiveD = () => {
 
                     {/* Category Badge */}
                     <div>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold border ${categoryInfo.color}`}>
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold border ${categoryInfo.color}`}>
                         {categoryInfo.label}
                       </span>
                     </div>
@@ -2358,7 +2380,7 @@ const DetectiveD = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setStayConnectedModalOpen(true)}
+                  onClick={() => setExportModalOpen(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-slate-300 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
                 >
                   <FileDown className="h-3.5 w-3.5" />
@@ -2370,7 +2392,7 @@ const DetectiveD = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setStayConnectedModalOpen(true)}
+                  onClick={() => setShareModalOpen(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-slate-300 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
                 >
                   <Share2 className="h-3.5 w-3.5" />
@@ -2382,7 +2404,7 @@ const DetectiveD = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setStayConnectedModalOpen(true)}
+                  onClick={() => setAuditModalOpen(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-slate-300 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
                 >
                   <Shield className="h-3.5 w-3.5" />
@@ -2592,6 +2614,15 @@ const DetectiveD = () => {
 
       {/* Detective D Explainer Modal - shows on first visit */}
       <DetectiveDExplainerModal open={showExplainerModal} onOpenChange={setShowExplainerModal} />
+
+      {/* Feedback popup shown after analysis */}
+      {showFeedbackPopup && (
+        <FeedbackPopup
+          fileName={activeFile?.name ?? null}
+          fileType={activeFile ? getFileType(activeFile.name) : null}
+          onClose={() => setShowFeedbackPopup(false)}
+        />
+      )}
 
       {/* Footer Action Modals */}
       {activeFile && (

@@ -33,8 +33,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           z-index: 2 !important;
           transition: color 0.2s !important;
         }
+        /* Add comfortable padding, rounded corners and spacing for toast body */
         [data-sonner-toast] {
-          padding-right: 40px !important;
+          padding: 12px 56px 12px 16px !important;
+          border-radius: 8px !important;
+          gap: 12px !important;
+          display: flex !important;
+          align-items: flex-start !important;
+          min-width: 280px !important;
         }
         [data-sonner-toast] [data-close-button]:hover {
           color: white !important;
@@ -52,8 +58,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
           classNames: {
             // Explicit dark background and high-contrast text to avoid white notifications
             toast:
-              "group toast bg-slate-900 text-white border-transparent shadow-lg pr-12",
-            description: "text-slate-200",
+              "group toast bg-slate-900 text-white border-transparent shadow-lg px-4 py-3 gap-3 items-start",
+            description: "text-slate-200 mt-0 leading-snug",
             // Small circular dismiss button on the right - no background
             actionButton: "ml-3 h-8 w-8 shrink-0 flex items-center justify-center rounded-full text-slate-300 hover:text-white transition-colors",
             cancelButton: "ml-3 h-8 w-8 shrink-0 flex items-center justify-center rounded-full text-slate-300 hover:text-white transition-colors",
