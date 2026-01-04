@@ -1,7 +1,12 @@
+
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { ContactModal } from "./ContactModal";
+
 
 export const Footer = () => {
   const navigate = useNavigate();
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   return (
     <footer className="border-t border-[#EAEAEA] dark:border-[#1E1E1E] py-8 sm:py-12 bg-white dark:bg-[#0F0F0F]">
@@ -53,16 +58,6 @@ export const Footer = () => {
                   Blog
                 </Link>
               </li>
-              <li>
-                <a
-                  href="https://twitter.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-[#6B6B6B] dark:text-[#A8A8A8] hover:text-[#1A1A1A] dark:hover:text-[#E8E8E8] transition-colors"
-                >
-                  Twitter
-                </a>
-              </li>
             </ul>
           </div>
 
@@ -71,12 +66,13 @@ export const Footer = () => {
             <h3 className="font-semibold text-[#1A1A1A] dark:text-[#E8E8E8] mb-4">Contact</h3>
             <ul className="space-y-2">
               <li>
-                <a
-                  href="#"
+                <button
+                  type="button"
+                  onClick={() => setContactModalOpen(true)}
                   className="text-sm text-[#6B6B6B] dark:text-[#A8A8A8] hover:text-[#1A1A1A] dark:hover:text-[#E8E8E8] transition-colors"
                 >
                   Contact
-                </a>
+                </button>
               </li>
             </ul>
           </div>
@@ -92,6 +88,7 @@ export const Footer = () => {
           </p>
         </div>
       </div>
+      <ContactModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
     </footer>
   );
 };
