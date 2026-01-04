@@ -2,7 +2,7 @@ import { SourceMapper, OffsetRange, DisplayRange } from './sourceMapper';
 import * as JSONC from 'jsonc-parser';
 
 /**
- * 🕵️ Detective D — Enterprise Data Investigation Engine
+ * Inspect — Enterprise Data Investigation Engine
  * 
  * Version: 2.0.0 (Professional 15-Module Architecture)
  * Philosophy: Deterministic. Evidence-based. Zero hallucinations.
@@ -223,7 +223,7 @@ export class DetectiveD {
           // Validate offset before conversion
           const startOffset = finding.location.startOffset
           if (typeof startOffset !== 'number' || startOffset < 0) {
-            console.warn('[Detective D] Invalid startOffset:', startOffset, 'for finding:', finding.summary)
+            console.warn('[Inspect] Invalid startOffset:', startOffset, 'for finding:', finding.summary)
             return {
               ...finding,
               location: {
@@ -244,7 +244,7 @@ export class DetectiveD {
             }
           }
         } catch (error) {
-          console.warn('[Detective D] Error converting offset to position:', error, 'for finding:', finding.summary)
+          console.warn('[Inspect] Error converting offset to position:', error, 'for finding:', finding.summary)
           return {
             ...finding,
             location: {
@@ -256,7 +256,7 @@ export class DetectiveD {
         }
       })
     } catch (err) {
-      console.error('[Detective D] Analysis failed:', err)
+      console.error('[Inspect] Analysis failed:', err)
       return [
         {
           id: this.nextId(),
@@ -481,7 +481,7 @@ export class DetectiveD {
       }
     } catch (error) {
       // If parsing fails, structural issues will be caught above
-      console.warn('[Detective D] CSV parsing failed during semantic analysis:', error)
+      console.warn('[Inspect] CSV parsing failed during semantic analysis:', error)
     }
   }
 
@@ -541,7 +541,7 @@ export class DetectiveD {
           this.detectSemanticIssuesForStructuredData(parsed)
         }
       } catch (error) {
-        console.warn('[Detective D] YAML parsing failed during semantic analysis:', error)
+        console.warn('[Inspect] YAML parsing failed during semantic analysis:', error)
       }
     }
   }
@@ -1614,7 +1614,7 @@ export class DetectiveD {
 
   private addFinding(params: Omit<DetectiveFinding, 'id'>): void {
     if (!params.evidence || Object.keys(params.evidence).length === 0) {
-      console.warn('[Detective D] Finding rejected: no evidence provided')
+      console.warn('[Inspect] Finding rejected: no evidence provided')
       return
     }
 
@@ -1639,7 +1639,7 @@ export class DetectiveD {
     suggested_action: string
   }): void {
     if (!params.evidence || Object.keys(params.evidence).length === 0) {
-      console.warn('[Detective D] Finding rejected: no evidence provided')
+      console.warn('[Inspect] Finding rejected: no evidence provided')
       return
     }
 
@@ -1741,7 +1741,7 @@ export class DetectiveD {
         endOffset: (node.offset || 0) + (node.length || 0)
       }
     } catch (error) {
-      console.warn('[Detective D] Failed to get JSON field offset:', error)
+      console.warn('[Inspect] Failed to get JSON field offset:', error)
       return null
     }
   }
@@ -2135,7 +2135,7 @@ export class DetectiveD {
         }
       })
     } catch (err) {
-      console.warn('[Detective D] Drift detection failed:', err)
+      console.warn('[Inspect] Drift detection failed:', err)
     }
   }
 }

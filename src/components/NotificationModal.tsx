@@ -65,7 +65,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
       } else {
         setIsSuccess(true);
         toast.success("Successfully subscribed!", {
-          description: "We'll notify you when Detective D launches.",
+          description: "We'll notify you when Inspect launches.",
         });
         
         // Reset form after 2 seconds and close modal
@@ -104,7 +104,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
             Get Notified
           </DialogTitle>
           <DialogDescription className="text-sm sm:text-base">
-            Be the first to know when Detective <span className="text-primary font-semibold">D</span> launches. 
+            Be the first to know when <span className="text-primary font-semibold">Inspect</span> launches.
             We'll send you an email notification.
           </DialogDescription>
         </DialogHeader>
@@ -168,7 +168,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
             <div>
               <h3 className="text-base sm:text-lg font-semibold mb-1 dark:text-foreground light:text-slate-900">You're all set!</h3>
               <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground light:text-slate-600">
-                We'll notify you when Detective D is ready.
+                We'll notify you when Inspect is ready.
               </p>
             </div>
           </div>

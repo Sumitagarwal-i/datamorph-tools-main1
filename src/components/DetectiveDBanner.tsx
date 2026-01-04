@@ -21,7 +21,7 @@ export function DetectiveDBanner() {
   const slides: SlideData[] = [
     {
       id: 0,
-      headline: "Detective D Beta is Live!",
+      headline: "Inspect Beta is Live!",
       subtext: "Your AI agent for deep error detection and anomaly repair.",
       image: "/b1.webp",
       cta: "Try Beta Now"
@@ -34,7 +34,7 @@ export function DetectiveDBanner() {
     },
     {
       id: 2,
-      headline: "Detective D spots hidden data issues.",
+      headline: "Inspect spots hidden data issues.",
       subtext: "Go beyond syntax. Find suspicious rows, invalid values, and logic inconsistencies that break downstream systems.",
       image: "/b3.webp"
     },
@@ -72,7 +72,7 @@ export function DetectiveDBanner() {
   }, [isHovered, slides.length]);
 
   return (
-    <div id="detective-d-banner" className="w-full max-w-[64rem] mx-auto px-2 sm:px-5 md:px-7 lg:px-10 mt-6 sm:mt-8 lg:mt-10 mb-4">
+    <div id="inspect-banner" className="w-full max-w-[64rem] mx-auto px-2 sm:px-5 md:px-7 lg:px-10 mt-6 sm:mt-8 lg:mt-10 mb-4">
       <Card onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)} className="w-full relative overflow-hidden bg-white border border-slate-300 shadow-sm rounded-md">
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row min-h-[240px] md:h-[280px] relative">
@@ -90,8 +90,8 @@ export function DetectiveDBanner() {
                 {slides[currentSlide].cta ? (
                   <div className="pt-1">
                     <button
-                      onClick={() => navigate('/detective-d')}
-                      aria-label="Try Detective D Beta"
+                      onClick={() => navigate('/inspect')}
+                      aria-label="Try Inspect Beta"
                       className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-full shadow-sm px-3 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
                       <span className="whitespace-nowrap">{slides[currentSlide].cta}</span>

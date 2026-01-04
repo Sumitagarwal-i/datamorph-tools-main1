@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      blogs: {
+        Row: {
+          id: string
+          title: string
+          slug: string
+          category: string
+          featured_image_path: string | null
+          featured_image_thumb_path: string | null
+          audio_path: string | null
+          media_paths: string[] | null
+          description: string
+          content: string
+          author: string
+          publish_date: string
+          created_at: string
+          updated_at: string
+          status: string
+          read_time: number | null
+          seo_meta: Json | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          slug: string
+          category: string
+          featured_image_path?: string | null
+          featured_image_thumb_path?: string | null
+          audio_path?: string | null
+          media_paths?: string[] | null
+          description: string
+          content: string
+          author: string
+          publish_date: string
+          created_at?: string
+          updated_at?: string
+          status: string
+          read_time?: number | null
+          seo_meta?: Json | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          slug?: string
+          category?: string
+          featured_image_path?: string | null
+          featured_image_thumb_path?: string | null
+          audio_path?: string | null
+          media_paths?: string[] | null
+          description?: string
+          content?: string
+          author?: string
+          publish_date?: string
+          created_at?: string
+          updated_at?: string
+          status?: string
+          read_time?: number | null
+          seo_meta?: Json | null
+        }
+        Relationships: []
+      }
       conversions: {
         Row: {
           id: string
@@ -142,7 +202,7 @@ export type Tables<
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

@@ -17,7 +17,7 @@ interface Section {
 
 const sections: Section[] = [
   { id: 'getting-started', title: 'Getting Started', icon: '' },
-  { id: 'how-it-thinks', title: 'How Detective D Works', icon: '' },
+  { id: 'how-it-thinks', title: 'How Inspect Works', icon: '' },
   { id: 'errors-explained', title: 'Understanding Issues', icon: '' },
   { id: 'export-reports', title: 'Export & Share', icon: '' },
   { id: 'limits-accuracy', title: 'Capabilities & Limits', icon: '' },
@@ -31,13 +31,13 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
       <div className="space-y-5">
         {/* Video Embed */}
         <div className="aspect-video rounded-lg overflow-hidden bg-black">
-          <YouTubeEmbed videoId="OSBS0LnuYUQ" title="Detective D Getting Started" />
+          <YouTubeEmbed videoId="OSBS0LnuYUQ" title="Inspect Getting Started" />
         </div>
 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Upload Your Data File</h3>
           <p className="text-slate-600 text-sm mb-2">
-            Detective D analyzes data files in multiple formats. Click the upload button or drag and drop to analyze your file.
+            Inspect analyzes data files in multiple formats. Click the upload button or drag and drop to analyze your file.
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• Supports JSON, CSV, XML, YAML and other formats</li>
@@ -49,7 +49,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Review Analysis Results</h3>
           <p className="text-slate-600 text-sm mb-2">
-            Once your file is uploaded, Detective D scans it for potential issues:
+            Once your file is uploaded, Inspect scans it for potential issues:
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• Structure problems (format errors, syntax issues)</li>
@@ -73,20 +73,20 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Edit Your Data</h3>
           <p className="text-slate-600 text-sm">
-            You can edit your data directly in the editor. Detective D will automatically re-analyze when you confirm your changes using the Confirm button.
+            You can edit your data directly in the editor. Inspect will automatically re-analyze when you confirm your changes using the Confirm button.
           </p>
         </div>
       </div>
     ),
   },
   'how-it-thinks': {
-    title: 'How Detective D Works',
+    title: 'How Inspect Works',
     content: (
       <div className="space-y-5">
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Analysis Process</h3>
           <p className="text-slate-600 text-sm mb-2">
-            Detective D analyzes your data files through two main phases:
+            Inspect analyzes your data files through two main phases:
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• <strong>Structure Analysis:</strong> Checks if the file is properly formatted and valid</li>
@@ -97,7 +97,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">What Gets Checked</h3>
           <p className="text-slate-600 text-sm mb-2">
-            Detective D looks for:
+            Inspect looks for:
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• Invalid number values (NaN, Infinity)</li>
@@ -111,7 +111,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">How Issues Are Reported</h3>
           <p className="text-slate-600 text-sm mb-2">
-            For each issue found, Detective D provides:
+            For each issue found, Inspect provides:
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• Exact location (line and column)</li>
@@ -137,7 +137,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Issue Severity Levels</h3>
           <p className="text-slate-600 text-sm mb-2">
-            Detective D classifies issues at three levels:
+            Inspect classifies issues at three levels:
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• <strong>Error:</strong> Critical structural problems that prevent proper data processing</li>
@@ -185,7 +185,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Context Matters</h3>
           <p className="text-slate-600 text-sm">
-            Detective D identifies potential problems, but you understand your data best. Some "issues" may be perfectly valid for your specific use case. Always review findings with your business knowledge.
+            Inspect identifies potential problems, but you understand your data best. Some "issues" may be perfectly valid for your specific use case. Always review findings with your business knowledge.
           </p>
         </div>
       </div>
@@ -267,14 +267,14 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">File Size Limits</h3>
           <p className="text-slate-600 text-sm">
-            Detective D supports files up to <strong>10 MB</strong> in size. For larger files, consider splitting them into smaller datasets for analysis.
+            Inspect supports files up to <strong>10 MB</strong> in size. For larger files, consider splitting them into smaller datasets for analysis.
           </p>
         </div>
 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Supported Formats</h3>
           <p className="text-slate-600 text-sm mb-2">
-            Detective D automatically detects and analyzes:
+            Inspect automatically detects and analyzes:
           </p>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>• JSON (and JSON with comments)</li>
@@ -286,7 +286,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         </div>
 
         <div>
-          <h3 className="font-semibold text-slate-900 mb-2">What Detective D Checks</h3>
+          <h3 className="font-semibold text-slate-900 mb-2">What Inspect Checks</h3>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>✓ File format and structure validity</li>
             <li>✓ Data type consistency</li>
@@ -298,7 +298,7 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         </div>
 
         <div>
-          <h3 className="font-semibold text-slate-900 mb-2">What Detective D Doesn't Check</h3>
+          <h3 className="font-semibold text-slate-900 mb-2">What Inspect Doesn't Check</h3>
           <ul className="text-sm text-slate-600 space-y-1 ml-4">
             <li>✗ Business rule validation (specific to your domain)</li>
             <li>✗ Semantic meaning of the data</li>
@@ -330,14 +330,14 @@ const helpContent: Record<SectionId, { title: string; content: JSX.Element }> = 
         <div>
           <h3 className="font-semibold text-slate-900 mb-2">Is my data sent to a server?</h3>
           <p className="text-slate-600 text-sm">
-            No. Detective D runs entirely in your browser. Your data never leaves your computer and is never sent anywhere.
+            No. Inspect runs entirely in your browser. Your data never leaves your computer and is never sent anywhere.
           </p>
         </div>
 
         <div>
-          <h3 className="font-semibold text-slate-900 mb-2">Can Detective D fix my data?</h3>
+          <h3 className="font-semibold text-slate-900 mb-2">Can Inspect fix my data?</h3>
           <p className="text-slate-600 text-sm">
-            Detective D identifies and explains issues with suggestions for fixes. You make the actual changes to your data.
+            Inspect identifies and explains issues with suggestions for fixes. You make the actual changes to your data.
           </p>
         </div>
 
@@ -416,7 +416,7 @@ export const HelpCenterModal = ({ open, onOpenChange }: HelpCenterModalProps) =>
         {/* Header */}
         <div className="border-b border-slate-200 px-8 py-6 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Detective D Help</h1>
+            <h1 className="text-3xl font-bold text-slate-900">Inspect Help</h1>
             <p className="text-sm text-slate-500 mt-1">Learn how to get the most out of your analysis</p>
           </div>
           <button
@@ -462,7 +462,7 @@ export const HelpCenterModal = ({ open, onOpenChange }: HelpCenterModalProps) =>
 
         {/* Footer */}
         <div className="border-t border-slate-200 bg-slate-50 px-8 py-4 text-center text-xs text-slate-500">
-          <p>Detective D Help • Powered by DatumInt • Press ESC to close</p>
+          <p>Inspect Help • Powered by DatumInt • Press ESC to close</p>
         </div>
       </div>
     </div>

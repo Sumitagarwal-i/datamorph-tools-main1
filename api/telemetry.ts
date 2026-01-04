@@ -5,9 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-  const body = req.body || {};
+  const body = (req.body && typeof req.body === 'object') ? req.body : {};
   const eventType = body.event_type || 'unknown';
-  const metadata = body.metadata || {};
+  const metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
   const timestamp = new Date().toISOString();
 
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -22,13 +22,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const client = createClient(supabaseUrl, supabaseKey);
 
-    await client.from('analytics_events').insert([{
+    const { error } = await client.from('analytics_events').insert([{
       event_type: eventType,
       timestamp,
       metadata,
       user_agent: req.headers['user-agent'] || null,
       ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || null,
+      file_name: (metadata as any)?.file_name ?? null,
+      file_type: (metadata as any)?.file_type ?? null,
     }]);
+
+    if (error) {
+      console.error('[telemetry] insert failed', error);
+      return res.status(500).json({ error: 'failed to log telemetry' });
+    }
 
     return res.status(201).json({ ok: true });
   } catch (err) {

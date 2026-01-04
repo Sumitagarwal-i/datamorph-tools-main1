@@ -27,9 +27,9 @@ export const DetectiveDScreen = ({ isOpen, onClose }: DetectiveDScreenProps) => 
         <div className="flex items-center justify-between p-4 border-b border-border bg-card">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-primary text-lg font-bold">D</span>
+              <span className="text-primary text-lg font-bold">I</span>
             </div>
-            <h2 className="text-lg font-semibold">Detective D</h2>
+            <h2 className="text-lg font-semibold">Inspect</h2>
           </div>
           <Button
             variant="ghost"

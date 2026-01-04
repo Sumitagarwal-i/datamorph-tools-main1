@@ -34,7 +34,7 @@ const WhatDetectiveDDoes = () => (
           <Search className="h-6 w-6 text-white" />
         </div>
         <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-          What Detective D Does 🕵️
+          What Inspect Does 🕵️
         </h2>
       </div>
       <p className="text-slate-400 text-sm">
@@ -51,7 +51,7 @@ const WhatDetectiveDDoes = () => (
           <div>
             <h3 className="font-semibold text-blue-300 text-lg mb-2">Instant Data Health Checks</h3>
             <p className="text-slate-300 text-sm leading-relaxed">
-              Detective D automatically scans your JSON, CSV, XML, and YAML files the moment you upload them. 
+              Inspect automatically scans your JSON, CSV, XML, and YAML files the moment you upload them.
               No "Analyze" button needed—it just works! Think of it as a spell-checker, but for your data.
             </p>
           </div>
@@ -66,7 +66,7 @@ const WhatDetectiveDDoes = () => (
           <div>
             <h3 className="font-semibold text-purple-300 text-lg mb-2">Comprehensive Data Quality Checks</h3>
             <p className="text-slate-300 text-sm leading-relaxed mb-3">
-              Detective D performs four levels of analysis:
+              Inspect performs four levels of analysis:
             </p>
             <div className="space-y-4 text-sm">
               <div>
@@ -125,7 +125,7 @@ const WhatDetectiveDDoes = () => (
 
     <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-5">
       <p className="text-sm text-slate-300 leading-relaxed">
-        <strong className="text-slate-100">💡 Pro tip:</strong> Detective D is deterministic—it never guesses or hallucinates. 
+        <strong className="text-slate-100">💡 Pro tip:</strong> Inspect is deterministic. It never guesses or hallucinates.
         Every finding is backed by evidence, so you can trust what it tells you!
       </p>
     </div>
@@ -157,8 +157,8 @@ const HowItWorks = () => (
             <span className="text-2xl">1️⃣</span> Upload Your File
           </h3>
           <p className="text-sm text-slate-300 leading-relaxed">
-            Drop your JSON, CSV, XML, or YAML file onto Detective D. It works with files up to <strong>50MB</strong>.
-            The moment your file uploads, Detective D springs into action!
+            Drop your JSON, CSV, XML, or YAML file onto Inspect. It works with files up to <strong>50MB</strong>.
+            The moment your file uploads, Inspect springs into action!
           </p>
         </div>
       </div>
@@ -171,12 +171,12 @@ const HowItWorks = () => (
             <span className="text-2xl">2️⃣</span> Automatic Structure Check
           </h3>
           <p className="text-sm text-slate-300 leading-relaxed mb-3">
-            First, Detective D validates your file's structure—like checking if your JSON has matching brackets 
+            First, Inspect validates your file's structure, like checking if your JSON has matching brackets
             or your CSV has consistent columns. These show up with a <strong className="text-red-400">red border</strong> in the issues panel.
           </p>
           <div className="bg-slate-900 border border-slate-600 rounded p-3 text-xs font-mono text-slate-400">
             <div className="text-red-400">❌ Missing comma at line 15, column 23</div>
-            <div className="text-slate-500 mt-1">// Detective D catches syntax errors instantly</div>
+            <div className="text-slate-500 mt-1">// Inspect catches syntax errors instantly</div>
           </div>
         </div>
       </div>
@@ -189,7 +189,7 @@ const HowItWorks = () => (
             <span className="text-2xl">3️⃣</span> Deep Data Analysis
           </h3>
           <p className="text-sm text-slate-300 leading-relaxed mb-3">
-            Then Detective D analyzes your data's <em>meaning</em>—checking types, spotting outliers, 
+            Then Inspect analyzes your data's <em>meaning</em>, checking types, spotting outliers,
             finding duplicate IDs, and catching logic errors. These show up with color-coded borders:
           </p>
           <div className="space-y-2 text-sm">
@@ -218,7 +218,7 @@ const HowItWorks = () => (
           </h3>
           <p className="text-sm text-slate-300 leading-relaxed">
             Click any issue in the left panel to see detailed explanations on the right. Use the <strong>"Go to Line"</strong> button 
-            to jump straight to the problem in your code. Fix it, and Detective D will recheck automatically!
+            to jump straight to the problem in your code. Fix it, and Inspect will recheck automatically!
           </p>
         </div>
       </div>
@@ -238,7 +238,7 @@ const HowItWorks = () => (
           <div className="text-slate-300">{"}"}</div>
         </div>
         <div>
-          <div className="text-yellow-400">⚠️ Detective D says:</div>
+          <div className="text-yellow-400">⚠️ Inspect says:</div>
           <div className="text-slate-400 mt-1">"Age should be a number, but found text. This will break calculations!"</div>
         </div>
       </div>
@@ -253,7 +253,7 @@ const FAQs = () => (
         Frequently Asked Questions 💬
       </h2>
       <p className="text-slate-400 text-sm">
-        Everything you need to know about Detective D
+        Everything you need to know about Inspect
       </p>
     </div>
 
@@ -265,7 +265,7 @@ const FAQs = () => (
           <span>Do I need to click "Analyze" after uploading?</span>
         </h3>
         <p className="text-sm text-slate-300 leading-relaxed pl-6">
-          <strong className="text-green-400">A:</strong> Nope! Detective D analyzes automatically on upload. 
+          <strong className="text-green-400">A:</strong> Nope! Inspect analyzes automatically on upload.
           Just drop your file and watch the issues appear. It's like magic, but deterministic! ✨
         </p>
       </div>
@@ -277,7 +277,7 @@ const FAQs = () => (
           <span>What file formats does it support?</span>
         </h3>
         <p className="text-sm text-slate-300 leading-relaxed pl-6">
-          <strong className="text-green-400">A:</strong> Detective D works with <strong>JSON, CSV, XML, and YAML</strong> files 
+          <strong className="text-green-400">A:</strong> Inspect works with <strong>JSON, CSV, XML, and YAML</strong> files
           up to 50MB. Perfect for config files, API responses, datasets, and more!
         </p>
       </div>
@@ -290,7 +290,7 @@ const FAQs = () => (
         </h3>
         <p className="text-sm text-slate-300 leading-relaxed pl-6">
           <strong className="text-green-400">A:</strong> It's best to fix structure errors first (like missing commas or brackets), 
-          but Detective D will try its best to analyze what it can. The error panel will guide you!
+          but Inspect will try its best to analyze what it can. The error panel will guide you!
         </p>
       </div>
 
@@ -315,11 +315,11 @@ const FAQs = () => (
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-5 space-y-2">
         <h3 className="font-semibold text-slate-100 flex items-start gap-2">
           <span className="text-green-400 flex-shrink-0">Q:</span>
-          <span>Does Detective D use AI?</span>
+          <span>Does Inspect use AI?</span>
         </h3>
         <p className="text-sm text-slate-300 leading-relaxed pl-6">
-          <strong className="text-green-400">A:</strong> Nope! Detective D is 100% deterministic and rule-based. 
-          It never guesses or hallucinates—every finding is backed by hard evidence. You can trust what it tells you!
+          <strong className="text-green-400">A:</strong> Nope! Inspect is 100% deterministic and rule-based.
+          It never guesses or hallucinates. Every finding is backed by hard evidence. You can trust what it tells you!
         </p>
       </div>
 
@@ -342,7 +342,7 @@ const FAQs = () => (
           <span>What if I upload multiple files?</span>
         </h3>
         <p className="text-sm text-slate-300 leading-relaxed pl-6">
-          <strong className="text-green-400">A:</strong> No problem! Detective D handles multiple files like a pro. 
+          <strong className="text-green-400">A:</strong> No problem! Inspect handles multiple files like a pro.
           Each file gets its own tab, and errors are isolated per file—no cross-contamination!
         </p>
       </div>
@@ -354,7 +354,7 @@ const FAQs = () => (
           <span>Is my data safe?</span>
         </h3>
         <p className="text-sm text-slate-300 leading-relaxed pl-6">
-          <strong className="text-green-400">A:</strong> Absolutely! All analysis happens in your browser—your data never leaves your machine. 
+          <strong className="text-green-400">A:</strong> Absolutely! All analysis happens in your browser. Your data never leaves your machine.
           Privacy-first by design. 🔒
         </p>
       </div>
@@ -363,10 +363,10 @@ const FAQs = () => (
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-5 space-y-2">
         <h3 className="font-semibold text-slate-100 flex items-start gap-2">
           <span className="text-green-400 flex-shrink-0">Q:</span>
-          <span>What does Detective D NOT check?</span>
+          <span>What does Inspect NOT check?</span>
         </h3>
         <div className="text-sm text-slate-300 leading-relaxed pl-6 space-y-2">
-          <p><strong className="text-green-400">A:</strong> Detective D is rule-based and deterministic. It does NOT:</p>
+          <p><strong className="text-green-400">A:</strong> Inspect is rule-based and deterministic. It does NOT:</p>
           <ul className="space-y-1 ml-4">
             <li className="text-slate-400">• Check deep business logic (e.g., "salary must be greater than minimum wage")</li>
             <li className="text-slate-400">• Validate cross-file relationships</li>
@@ -380,8 +380,8 @@ const FAQs = () => (
 
     <div className="bg-gradient-to-r from-green-500/10 to-teal-500/10 border border-green-500/20 rounded-lg p-5 text-center">
       <p className="text-sm text-slate-300">
-        <strong className="text-green-400">Still have questions?</strong> Detective D is here to help! 
-        Just upload a file and start exploring—it's easier to learn by doing! 🚀
+        <strong className="text-green-400">Still have questions?</strong> Inspect is here to help!
+        Just upload a file and start exploring. It's easier to learn by doing! 🚀
       </p>
     </div>
   </div>

@@ -30,9 +30,11 @@ export const PasscodeModal = ({ open, onOpenChange }: PasscodeModalProps) => {
     
     if (passcode === CORRECT_PASSCODE) {
       // Store authentication in sessionStorage
+      sessionStorage.setItem("inspect_auth", "true");
+      // Backward compatibility for legacy key
       sessionStorage.setItem("detective_d_auth", "true");
       onOpenChange(false);
-      navigate("/detective-d");
+      navigate("/inspect");
       setPasscode("");
       setError(false);
     } else {
@@ -58,7 +60,7 @@ export const PasscodeModal = ({ open, onOpenChange }: PasscodeModalProps) => {
             <div>
               <DialogTitle>Developer Access Required</DialogTitle>
               <DialogDescription className="text-xs mt-1">
-                Detective D is currently in development
+                Inspect is currently in development
               </DialogDescription>
             </div>
           </div>
@@ -101,7 +103,7 @@ export const PasscodeModal = ({ open, onOpenChange }: PasscodeModalProps) => {
               Cancel
             </Button>
             <Button type="submit">
-              Access Detective D
+              Access Inspect
             </Button>
           </DialogFooter>
         </form>

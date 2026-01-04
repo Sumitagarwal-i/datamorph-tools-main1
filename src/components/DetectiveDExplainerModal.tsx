@@ -15,7 +15,7 @@ export function DetectiveDExplainerModal({ open, onOpenChange }: DetectiveDExpla
       <div className="bg-[#181A1B] border border-[#23262A] rounded-t-xl shadow-lg w-full max-w-md mx-auto p-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <div className="font-semibold text-base text-[#E6E7E9]">Let's understand Detective D</div>
+          <div className="font-semibold text-base text-[#E6E7E9]">Let's understand Inspect</div>
           <button
             onClick={() => onOpenChange(false)}
             className="text-xs text-[#7A7F86] px-2 py-1 hover:bg-[#23262A] rounded"
@@ -27,10 +27,10 @@ export function DetectiveDExplainerModal({ open, onOpenChange }: DetectiveDExpla
 
         {/* Content */}
         <div className="mb-4 text-sm text-[#D0D3D8]">
-          Watch this quick video to see how Detective D works and how it can help you find and fix data issues.
+          Watch this quick video to see how Inspect works and how it can help you find and fix data issues.
         </div>
         <div className="mt-3">
-          <YouTubeEmbed videoId="OSBS0LnuYUQ" title="Detective D Explainer Video" />
+          <YouTubeEmbed videoId="OSBS0LnuYUQ" title="Inspect Explainer Video" />
         </div>
         <p className="text-[#7A7F86] text-xs text-center mt-3">
           You can learn more in the Help Center anytime by clicking the Help button.

@@ -84,12 +84,12 @@ export function FeedbackPopup({ fileName, fileType, onClose }: { fileName?: stri
     <div className="fixed bottom-0 left-0 w-full flex justify-center z-50">
       <div className="bg-[#181A1B] border border-[#23262A] rounded-t-xl shadow-lg w-full max-w-md mx-auto p-6 animate-fade-in">
         <div className="flex items-center justify-between mb-2">
-          <div className="font-semibold text-base text-[#E6E7E9]">Help improve Detective D</div>
+          <div className="font-semibold text-base text-[#E6E7E9]">Help improve Inspect</div>
           <button className="text-xs text-[#7A7F86] px-2 py-1 hover:bg-[#23262A] rounded" onClick={onClose}>Skip</button>
         </div>
         {step === "main" && (
           <>
-            <div className="mb-4 text-sm text-[#D0D3D8]">Did Detective D help you understand your file better?</div>
+            <div className="mb-4 text-sm text-[#D0D3D8]">Did Inspect help you understand your file better?</div>
             <div className="flex flex-col gap-2 mb-4">
               {FEEDBACK_OPTIONS.map(opt => (
                 <button key={opt.value} className={`px-3 py-2 rounded border border-[#23262A] text-left text-sm font-medium bg-[#202225] hover:bg-[#23262A] transition-colors ${primary === opt.value ? "border-blue-500" : ""}`} onClick={() => handlePrimary(opt.value)}>{opt.label}</button>
@@ -130,7 +130,7 @@ export function FeedbackPopup({ fileName, fileType, onClose }: { fileName?: stri
               <button className="px-4 py-2 rounded bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors" disabled={submitting} onClick={handleSubmit}>Submit</button>
               <button className="px-4 py-2 rounded bg-[#23262A] text-[#7A7F86] font-semibold text-sm hover:bg-[#23262A]/80 transition-colors" onClick={onClose}>Close</button>
             </div>
-            <div className="text-xs text-[#7A7F86] mt-3">Detective D is in early stages — your feedback directly shapes what we build next.</div>
+            <div className="text-xs text-[#7A7F86] mt-3">Inspect is in early stages. Your feedback directly shapes what we build next.</div>
           </>
         )}
         {step === "done" && (

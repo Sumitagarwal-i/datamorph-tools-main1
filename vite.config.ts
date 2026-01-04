@@ -38,10 +38,25 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Only chunk your own code, not libraries!
-          if (id.includes('src/pages')) return 'pages';
-          if (id.includes('src/components') && !id.includes('ui/')) return 'components';
-          if (id.includes('src/lib')) return 'lib';
+          // Split large dependencies for better caching + parallel loading.
+          // Avoid forcing all app components into one mega-chunk.
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/scheduler/')
+            ) {
+              return 'react';
+            }
+            if (id.includes('monaco-editor') || id.includes('@monaco-editor')) return 'monaco';
+            if (id.includes('@tiptap')) return 'tiptap';
+            if (id.includes('recharts')) return 'recharts';
+            if (id.includes('@radix-ui')) return 'radix';
+            if (id.includes('@supabase')) return 'supabase';
+            if (id.includes('@tanstack')) return 'tanstack';
+            if (id.includes('react-router')) return 'router';
+            return 'vendor';
+          }
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',

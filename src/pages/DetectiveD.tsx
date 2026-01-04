@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Upload, RotateCcw, Moon, Sun, HelpCircle, X, Check, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Table, AlignLeft, Zap, ExternalLink, FileDown, Share2, Shield, Bell, MessageSquare, AlertCircle, Info } from "lucide-react";
+import { Upload, ClipboardPaste, RotateCcw, Moon, Sun, HelpCircle, X, Check, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Table, AlignLeft, Zap, ExternalLink, FileDown, Share2, Shield, Bell, MessageSquare, AlertCircle, Info } from "lucide-react";
 import { HelpCenterModal } from "@/components/HelpCenterModal";
 import { DetectiveDExplainerModal } from "@/components/DetectiveDExplainerModal";
 import { ShareModal } from "@/components/ShareModal";
@@ -24,7 +24,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
-import { DetectiveD as DetectiveDEngine, DetectiveFinding } from "@/lib/detectiveD";
+import { DetectiveD as DetectiveDEngine, DetectiveFinding } from "@/lib/inspect";
 import { StructureValidator, StructureIssue, StructureValidationResult } from "@/lib/structureValidator";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,7 +39,7 @@ const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // ============================================================================
-// UI TYPE - Convert Detective Finding to ErrorItem for display
+// UI TYPE - Convert Inspect Finding to ErrorItem for display
 // ============================================================================
 interface ErrorItem {
   id: string;
@@ -59,7 +59,7 @@ interface ErrorItem {
   explanation?: string;
   suggestions?: string[];
   
-  // Detective D specific properties
+  // Inspect specific properties
   evidence?: {
     observed?: string;
     expected_range?: string;
@@ -79,7 +79,7 @@ interface TableView {
 
 // Custom Monaco theme definition
 const defineCustomTheme = (monaco: any) => {
-  monaco.editor.defineTheme('detective-dark', {
+  monaco.editor.defineTheme('inspect-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
@@ -140,6 +140,9 @@ const DetectiveD = () => {
   const [hasStructureErrors, setHasStructureErrors] = useState(false);
   const [isFixingStructure, setIsFixingStructure] = useState(false);
   const [showFileLimitModal, setShowFileLimitModal] = useState(false);
+  const [showPasteDataModal, setShowPasteDataModal] = useState(false);
+  const [pasteDataText, setPasteDataText] = useState("");
+  const [latestGuessedName, setLatestGuessedName] = useState<string | null>(null);
   const [isRealTimeValidating, setIsRealTimeValidating] = useState(false);
   const [validationTimeoutId, setValidationTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
@@ -177,12 +180,15 @@ const DetectiveD = () => {
   // Show feedback popup once per browser session (avoid repeated annoyance)
   const triggerFeedbackPopupOnce = () => {
     try {
-      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('detective_feedback_shown')) {
+      if (
+        typeof sessionStorage !== 'undefined' &&
+        (sessionStorage.getItem('inspect_feedback_shown') || sessionStorage.getItem('detective_feedback_shown'))
+      ) {
         return;
       }
       setShowFeedbackPopup(true);
       if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem('detective_feedback_shown', '1');
+        sessionStorage.setItem('inspect_feedback_shown', '1');
       }
     } catch (err) {
       // ignore storage errors
@@ -190,10 +196,135 @@ const DetectiveD = () => {
     }
   };
 
-  // Detective D is now public - no passcode required
+  // Inspect is now public - no passcode required
 
   const handleFileUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const addVirtualFile = (name: string, content: string, source: 'upload' | 'paste', originalSizeBytes?: number) => {
+    const contentSizeMB = new Blob([content]).size / (1024 * 1024);
+    if (contentSizeMB > MAX_FILE_SIZE_MB) {
+      toast.error(`Content too large: ${contentSizeMB.toFixed(2)}MB`, {
+        description: `Maximum size is ${MAX_FILE_SIZE_MB}MB. Please use smaller data or split it.`,
+        duration: 6000,
+      });
+      return;
+    }
+
+    // Limit to maximum 2 open files
+    if (uploadedFiles.length >= 2) {
+      setShowFileLimitModal(true);
+      return;
+    }
+
+    const newFile: UploadedFile = {
+      id: Date.now().toString(),
+      name,
+      content,
+    };
+
+    setUploadedFiles(prev => [...prev, newFile]);
+    setActiveFileId(newFile.id);
+
+    try {
+      trackEvent(source === 'paste' ? 'file_paste' : 'file_upload', {
+        file_name: newFile.name,
+        content_length: newFile.content.length,
+      });
+    } catch (e) {}
+
+    // Automatically validate structure on add
+    validateFileStructure(content, name);
+
+    const sizeKB = (originalSizeBytes ?? new Blob([content]).size) / 1024;
+    toast.success(source === 'paste' ? 'Data pasted successfully' : 'File uploaded successfully', {
+      description: `${name} (${sizeKB.toFixed(1)}KB)`,
+      duration: 3000,
+    });
+  };
+
+  const guessPastedFileName = (raw: string) => {
+    const text = raw.trimStart();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    if (text.startsWith('{') || text.startsWith('[')) return `pasted-${stamp}.json`;
+    if (text.startsWith('<?xml') || text.startsWith('<')) return `pasted-${stamp}.xml`;
+
+    // Basic CSV heuristic
+    if (raw.includes('\n') && raw.includes(',')) return `pasted-${stamp}.csv`;
+
+    // Basic YAML heuristic
+    if (/^\s*[\w\-]+\s*:\s*.+/m.test(raw) && !raw.includes('{') && !raw.includes('}')) {
+      return `pasted-${stamp}.yaml`;
+    }
+
+    return `pasted-${stamp}.txt`;
+  };
+
+  useEffect(() => {
+    if (!pasteDataText.trim()) {
+      setLatestGuessedName(null);
+      return;
+    }
+    setLatestGuessedName(guessPastedFileName(pasteDataText));
+  }, [pasteDataText]);
+
+  const pasteHelperButtons = [
+    { action: 'trim', title: 'Trim whitespace', description: 'Drop empty lines and edges' },
+    { action: 'beautifyJson', title: 'Beautify JSON', description: 'Indent JSON with 2 spaces' },
+    { action: 'escapeQuotes', title: 'Escape quotes', description: 'Prep JSON for inline strings' },
+  ] as const;
+
+  type PasteHelperAction = (typeof pasteHelperButtons)[number]['action'];
+
+  const handleOpenPasteData = () => {
+    if (uploadedFiles.length >= 2) {
+      setShowFileLimitModal(true);
+      return;
+    }
+    setPasteDataText('');
+    setLatestGuessedName(null);
+    setShowPasteDataModal(true);
+  };
+
+  const handleConfirmPasteData = () => {
+    const content = pasteDataText;
+    if (!content || content.trim().length === 0) {
+      toast.error('Paste some data first', { duration: 3000 });
+      return;
+    }
+    const name = guessPastedFileName(content);
+    addVirtualFile(name, content, 'paste');
+    setShowPasteDataModal(false);
+    setPasteDataText('');
+  };
+
+  const handlePasteHelper = (action: PasteHelperAction) => {
+    if (!pasteDataText) {
+      toast.info('Type or paste something first');
+      return;
+    }
+
+    if (action === 'trim') {
+      setPasteDataText(prev => prev.trim());
+      toast.success('Whitespace trimmed');
+    }
+
+    if (action === 'beautifyJson') {
+      try {
+        const parsed = JSON.parse(pasteDataText);
+        setPasteDataText(JSON.stringify(parsed, null, 2));
+        toast.success('JSON formatted beautifully');
+      } catch (error) {
+        toast.error('Paste text is not valid JSON');
+      }
+    }
+
+    if (action === 'escapeQuotes') {
+      setPasteDataText(prev => prev.replace(/"/g, '\\"'));
+      toast.success('Quotes escaped');
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,46 +343,8 @@ const DetectiveD = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const content = event.target?.result as string;
-        
-        // Double-check content size
-        const contentSizeMB = new Blob([content]).size / (1024 * 1024);
-        if (contentSizeMB > MAX_FILE_SIZE_MB) {
-          toast.error(`Content too large: ${contentSizeMB.toFixed(2)}MB`, {
-            description: `Maximum file size is ${MAX_FILE_SIZE_MB}MB for AI analysis.`,
-            duration: 6000,
-          });
-          return;
-        }
 
-        const newFile: UploadedFile = {
-          id: Date.now().toString(),
-          name: file.name,
-          content: content
-        };
-        
-        // Limit to maximum 2 open files
-        if (uploadedFiles.length >= 2) {
-          setShowFileLimitModal(true);
-          return;
-        }
-        
-        setUploadedFiles(prev => [...prev, newFile]);
-        setActiveFileId(newFile.id);
-        // Telemetry: file uploaded
-        try {
-          trackEvent('file_upload', {
-            file_name: newFile.name,
-            content_length: newFile.content.length,
-          });
-        } catch (e) {}
-        
-        // Automatically validate structure on upload
-        validateFileStructure(content, file.name);
-        
-        toast.success('File uploaded successfully', {
-          description: `${file.name} (${(file.size / 1024).toFixed(1)}KB)`,
-          duration: 3000,
-        });
+        addVirtualFile(file.name, content, 'upload', file.size);
       };
       reader.readAsText(file);
       // Clear input value to allow re-uploading the same file
@@ -320,7 +413,7 @@ const DetectiveD = () => {
 
   // ============================================================================
   // NOTE: Deep Dive / AI Analysis REMOVED
-  // All analysis is now deterministic via Detective D engine running locally
+  // All analysis is now deterministic via Inspect engine running locally
   // Real-time validation happens automatically - no external API calls
   // ============================================================================
   // Manual analysis function - triggered by button click only
@@ -370,7 +463,7 @@ const DetectiveD = () => {
       setIsAnalyzing(true);
       trackEvent('analysis_start', { file_name: activeFile?.name, file_type: fileType, content_length: editorContent.length });
       
-      // Run Detective D engine
+      // Run Inspect engine
       const engine = new DetectiveDEngine(editorContent, activeFile.name);
       const findings = await engine.analyze();
       
@@ -390,7 +483,7 @@ const DetectiveD = () => {
         explanation: `${finding.evidence.observed ? `Observed: ${JSON.stringify(finding.evidence.observed)}. ` : ''}${finding.why_it_matters}`,
         suggestions: [finding.suggested_action],
         
-        // Include Detective D's detailed evidence
+        // Include Inspect's detailed evidence
         evidence: finding.evidence,
         whyItMatters: finding.why_it_matters,
         suggestedAction: finding.suggested_action
@@ -440,10 +533,10 @@ const DetectiveD = () => {
         setSelectedStructureIssue(null);
       }
     } catch (err) {
-      console.error('[Detective D] Analysis error:', err);
+      console.error('[Inspect] Analysis error:', err);
       try { trackEvent('analysis_failed', { file_name: activeFile?.name, file_type: fileType, message: String(err) }); } catch(e) {}
       toast.error('Analysis failed', {
-        description: 'Detective D encountered an error during analysis',
+        description: 'Inspect encountered an error during analysis',
         duration: 4000
       });
     } finally {
@@ -688,7 +781,7 @@ const DetectiveD = () => {
       return;
     }
     
-    // Structure is valid → auto-run Detective D analysis
+    // Structure is valid → auto-run Inspect analysis
     toast.success('Changes confirmed', {
       description: 'Running analysis on updated content...',
       duration: 2000
@@ -729,19 +822,19 @@ const DetectiveD = () => {
     let suggestion = '';
     let whyMatters = '';
     
-    // Use Detective D's evidence and context if available
+    // Use Inspect's evidence and context if available
     if (error.evidence) {
       actualValue = error.evidence.observed || '';
       expectedType = error.evidence.expected_range || error.evidence.expected || '';
       fieldPath = error.evidence.context || '';
       
-      // Use Detective D's statistic if available for better context
+      // Use Inspect's statistic if available for better context
       if (error.evidence.statistic) {
         actualValue += ` (${error.evidence.statistic})`;
       }
     }
     
-    // Use Detective D's explanations and suggestions
+    // Use Inspect's explanations and suggestions
     if (error.whyItMatters) {
       whyMatters = error.whyItMatters;
     } else if (error.explanation) {
@@ -754,7 +847,7 @@ const DetectiveD = () => {
       suggestion = error.suggestions[0];
     }
 
-    // If Detective D didn't provide values, try to extract from content
+    // If Inspect didn't provide values, try to extract from content
     if (!actualValue || !fieldPath) {
       if (extension === 'json') {
       try {
@@ -1402,7 +1495,7 @@ const DetectiveD = () => {
   }, [selectedErrorId]);
 
   return (
-    <div className="fixed inset-0 bg-[#0d0f13] text-slate-200 flex flex-col overflow-hidden detective-d-slide-in">
+    <div className="fixed inset-0 bg-[#0d0f13] text-slate-200 flex flex-col overflow-hidden inspect-slide-in">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -1421,7 +1514,7 @@ const DetectiveD = () => {
               <img src="/Logo.png" alt="DatumInt Logo" className="h-6 w-6" />
             </Link>
             <span className="mx-1 text-slate-600 text-lg font-bold select-none">/</span>
-            {/* Detective D Logo with Beta Badge and Version */}
+            {/* Inspect Logo with Beta Badge and Version */}
             <div className="flex items-center gap-2">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-100">
                 {/* Magnifying glass with circuit pattern - real-world tool meets digital analysis */}
@@ -1436,7 +1529,7 @@ const DetectiveD = () => {
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <h1 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                    Detective D
+                    Inspect
                     <span className="ml-1 text-xs text-slate-400 font-normal flex items-center">
                       v0.1
                         <span className="text-xs text-slate-400 ml-0.5">(Beta)</span>
@@ -1447,7 +1540,7 @@ const DetectiveD = () => {
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            <p className="max-w-xs">Detective D is in Beta. While it detects most structural and logical issues accurately, some edge cases or complex scenarios may be missed or misinterpreted. We're actively improving its logic and accuracy.</p>
+                            <p className="max-w-xs">Inspect is in Beta. While it detects most structural and logical issues accurately, some edge cases or complex scenarios may be missed or misinterpreted. We're actively improving its logic and accuracy.</p>
                           </TooltipContent>
                         </Tooltip>
                     </span>
@@ -1518,7 +1611,7 @@ const DetectiveD = () => {
                 <TooltipContent side="bottom">
                   {hasStructureErrors 
                     ? "Analyze data (will attempt analysis despite structural issues)" 
-                    : "Run comprehensive data analysis with Detective D"}
+                    : "Run comprehensive data analysis with Inspect"}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -1537,6 +1630,22 @@ const DetectiveD = () => {
                 )}
               </button>
             )}
+
+            {/* Paste Data Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleOpenPasteData}
+                  className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 gap-1 px-2"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                  <span className="text-xs font-medium hidden sm:inline">Paste</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Paste Data</TooltipContent>
+            </Tooltip>
 
             {/* Upload File Button */}
             <Tooltip>
@@ -1706,7 +1815,7 @@ const DetectiveD = () => {
               </div>
               <div className="space-y-2">
                 <div className="text-sm font-semibold text-[#E6E7E9]">Analyzing your data...</div>
-                <div className="text-xs text-[#7A7F86]">Detective D is scanning for issues</div>
+                <div className="text-xs text-[#7A7F86]">Inspect is scanning for issues</div>
               </div>
             </div>
           ) : (activeFile && (structureIssues.length > 0 || errors.length > 0)) ? (
@@ -2023,7 +2132,7 @@ const DetectiveD = () => {
                       defineCustomTheme(monaco);
                     }}
                     onMount={handleEditorDidMount}
-                    theme="detective-dark"
+                    theme="inspect-dark"
                     loading={<div className="flex items-center justify-center h-full bg-[#0F1113] text-[#7A7F86]">Loading editor...</div>}
                     options={{
                       fontSize: 14,
@@ -2198,7 +2307,7 @@ const DetectiveD = () => {
                               🚫 Analysis Blocked
                             </div>
                             <div className="text-xs text-orange-300">
-                              Fix these structural issues first, then you can run Detective D analysis. Structure errors must be resolved before semantic analysis can proceed.
+                              Fix these structural issues first, then you can run Inspect analysis. Structure errors must be resolved before semantic analysis can proceed.
                             </div>
                           </div>
                         </div>
@@ -2523,7 +2632,7 @@ const DetectiveD = () => {
             <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Tell us what you think</h2>
-                <p className="text-sm text-gray-600 mt-1">Help us improve Detective D</p>
+                <p className="text-sm text-gray-600 mt-1">Help us improve Inspect</p>
               </div>
               <button
                 onClick={() => {
@@ -2612,7 +2721,7 @@ const DetectiveD = () => {
       {/* Help Center Modal */}
       <HelpCenterModal open={helpCenterOpen} onOpenChange={setHelpCenterOpen} />
 
-      {/* Detective D Explainer Modal - shows on first visit */}
+      {/* Inspect Explainer Modal - shows on first visit */}
       <DetectiveDExplainerModal open={showExplainerModal} onOpenChange={setShowExplainerModal} />
 
       {/* Feedback popup shown after analysis */}
@@ -2669,6 +2778,61 @@ const DetectiveD = () => {
       )}
 
       {/* File Limit Modal */}
+      {showPasteDataModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#181A1B] border border-[#23262A] rounded-2xl shadow-2xl w-full max-w-4xl mx-4 p-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="font-semibold text-lg text-[#E6E7E9]">Paste data</div>
+                <div className="text-xs text-[#7A7F86]">Paste JSON, CSV, XML, YAML, or plain text. Max {MAX_FILE_SIZE_MB}MB.</div>
+              </div>
+              <button className="text-xs text-[#7A7F86] px-2 py-1 hover:bg-[#23262A] rounded" onClick={() => { setShowPasteDataModal(false); setPasteDataText(''); }}>Close</button>
+            </div>
+
+            <div className="grid gap-2 mb-4 sm:grid-cols-3">
+              {pasteHelperButtons.map(helper => (
+                <button
+                  key={helper.action}
+                  onClick={() => handlePasteHelper(helper.action)}
+                  className="flex flex-col rounded-xl border border-[#23262A] bg-[#101113] px-4 py-3 text-left shadow-sm transition-colors hover:border-blue-500 hover:bg-[#151719]"
+                >
+                  <span className="text-sm font-semibold text-white">{helper.title}</span>
+                  <span className="text-xs text-[#7A7F86] mt-1">{helper.description}</span>
+                </button>
+              ))}
+            </div>
+
+            {latestGuessedName && (
+              <div className="mb-3 text-xs text-[#9CA0A7]">Suggested filename: <span className="font-mono text-white">{latestGuessedName}</span></div>
+            )}
+
+            <div className="relative rounded-2xl bg-gradient-to-br from-slate-900/80 to-slate-800/60 p-[1px] mb-4 shadow-[0_0_40px_-15px_rgba(0,0,0,0.9)]">
+              <textarea
+                value={pasteDataText}
+                onChange={(e) => setPasteDataText(e.target.value)}
+                placeholder="Paste your data here…"
+                className="w-full min-h-[240px] max-h-[360px] rounded-2xl bg-[#0f1113] border border-transparent p-4 text-sm text-[#D0D3D8] placeholder:text-[#5A5C62] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowPasteDataModal(false); setPasteDataText(''); }}
+                className="px-5 py-2 rounded-full border border-[#32363C] bg-transparent text-sm font-semibold text-[#7A7F86] hover:border-blue-500 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPasteData}
+                className="px-5 py-2 rounded-full bg-blue-600 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-colors"
+              >
+                Use this data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showFileLimitModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-slate-900 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-slate-700">

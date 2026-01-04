@@ -42,11 +42,11 @@ export const AnnouncementBanner = () => {
           <circle cx="13" cy="13" r="0.8" fill="currentColor"/>
         </svg>
       ),
-      title: "Introducing Detective D",
-      description: "Your AI agent for deep error detection and smart data repair. Coming soon!",
+      title: "Introducing Inspect",
+      description: "Your agent for deep error detection and smart data repair. Coming soon!",
       cta: {
         text: "Try Our Flagship Feature",
-        action: () => navigate('/detective-d'),
+        action: () => navigate('/inspect'),
       },
       gradient: "bg-white dark:bg-gray-900",
     },

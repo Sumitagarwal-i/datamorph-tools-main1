@@ -414,8 +414,8 @@ All colors MUST be HSL.
     animation: float 3s ease-in-out infinite;
   }
 
-  /* Strong override to ensure Detective D covers the full viewport without any edge gutters */
-  .detective-d-slide-in {
+  /* Strong override to ensure Inspect covers the full viewport without any edge gutters */
+  .inspect-slide-in {
     position: fixed !important;
     inset: 0 !important;
     width: 100vw !important;
@@ -453,9 +453,27 @@ All colors MUST be HSL.
   select {
     border-radius: 1rem;
   }
+
+  /* Blog CTA button links inserted from the editor */
+  .prose a.blog-cta-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55em 1.05em;
+    border-radius: 0.75rem;
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-weight: 600;
+    text-decoration: none !important;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .prose a.blog-cta-button:hover {
+    opacity: 0.95;
+  }
 }
 
-/* Right panel scrollbar - dark themed to match Detective D */
+/* Right panel scrollbar - dark themed to match Inspect */
 .right-panel {
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: rgba(255,255,255,0.12) transparent; /* Firefox thumb and track */

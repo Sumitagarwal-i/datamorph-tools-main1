@@ -13,7 +13,7 @@ interface ShareModalProps {
 export const ShareModal = ({ open, onOpenChange, fileName, issueCount }: ShareModalProps) => {
   const [copied, setCopied] = useState(false);
 
-  const shareText = `Detective D found ${issueCount} issue(s) in ${fileName}. Analyzed with DatumInt's deterministic data quality engine.`;
+  const shareText = `Inspect found ${issueCount} issue(s) in ${fileName}. Analyzed with DatumInt's deterministic data quality engine.`;
   const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
 
   const handleCopy = () => {
@@ -24,7 +24,7 @@ export const ShareModal = ({ open, onOpenChange, fileName, issueCount }: ShareMo
   };
 
   const handleEmail = () => {
-    const subject = `Detective D Analysis: ${fileName}`;
+    const subject = `Inspect Analysis: ${fileName}`;
     const body = encodeURIComponent(`${shareText}\n\nAnalysis Details:\n${shareUrl}`);
     window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${body}`);
   };
@@ -115,7 +115,7 @@ export const ShareModal = ({ open, onOpenChange, fileName, issueCount }: ShareMo
           </div>
 
           <div className="pt-3 border-t border-[#2B2F33] text-center text-xs text-[#9CA3AF]">
-            <p>Powered by DatumInt • Detective D Analysis</p>
+            <p>Powered by DatumInt • Inspect Analysis</p>
           </div>
         </div>
       </div>
