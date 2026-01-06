@@ -1,4 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { toast } from "@/components/ui/sonner";
 import { BlogHeader } from "@/components/BlogHeader";
 import { Footer } from "@/components/Footer";
 import { Clock, ArrowLeft, Pause, Play } from "lucide-react";
@@ -219,9 +220,9 @@ const BlogPost = () => {
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(shareUrl);
-                      toast.success("Link copied");
+                      toast().success("Link copied");
                     } catch {
-                      toast.error("Could not copy link");
+                      toast().error("Could not copy link");
                     }
                   }}
                 >

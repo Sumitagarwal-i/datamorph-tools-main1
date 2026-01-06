@@ -602,7 +602,7 @@ const DetectiveD = () => {
           fixable: fixableCount
         });
         
-        toast.warning('Structure issues detected', {
+        toast.info('Structure issues detected', {
           description: `${errorCount} error(s), ${warningCount} warning(s). ${fixableCount} can be auto-fixed.`,
           duration: 5000
         });
