@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { slugify } from "@/lib/blog";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { useToast } from "@/contexts/ToastContext";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { getPublicUrl } from "@/lib/blog";
 import { Seo } from "@/components/Seo";

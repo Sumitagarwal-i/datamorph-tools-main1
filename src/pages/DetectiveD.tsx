@@ -9,7 +9,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { trackEvent } from "@/hooks/useTelemetry";
 import { FeedbackPopup } from '@/components/FeedbackPopup';
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { useToast } from "@/contexts/ToastContext";
 import Editor from "@monaco-editor/react";
 import {
   DropdownMenu,
@@ -122,6 +122,7 @@ const defineCustomTheme = (monaco: any) => {
 
 const DetectiveD = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
@@ -1594,7 +1595,7 @@ const DetectiveD = () => {
                     onClick={runAnalysis}
                     disabled={isAnalyzing || !editorContent || editorContent.trim().length === 0}
                     size="sm"
-                    className="gap-1 sm:gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all px-3 sm:px-4 py-2 font-medium"
+                    className="gap-1 sm:gap-2 bg-[#4F7CFF] hover:bg-[#3F6AE0] active:bg-[#3559C7] text-white shadow-sm transition-colors px-3 sm:px-4 py-2 font-medium"
                   >
                     {isAnalyzing ? (
                       <>
@@ -1915,20 +1916,45 @@ const DetectiveD = () => {
           ) : activeFile ? (
             <div className="px-3 py-8 text-center space-y-3">
               <div className="flex justify-center mb-3">
-                <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <span className="inline-block">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="block" aria-hidden="true">
+                    <circle
+                      cx="24" cy="24" r="20"
+                      stroke="#22c55e"
+                      strokeWidth="3.5"
+                      fill="none"
+                      className="animate-[dashcircle_0.7s_ease-out_forwards]"
+                      style={{ strokeDasharray: 126, strokeDashoffset: 126 }}
+                    />
+                    <path
+                      d="M16 25.5L22 31L33 19"
+                      stroke="#22c55e"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      className="animate-[dashtick_0.5s_0.5s_ease-out_forwards]"
+                      style={{ strokeDasharray: 32, strokeDashoffset: 32 }}
+                    />
                   </svg>
-                </div>
+                  <style>{`
+                    @keyframes dashcircle {
+                      to { stroke-dashoffset: 0; }
+                    }
+                    @keyframes dashtick {
+                      to { stroke-dashoffset: 0; }
+                    }
+                  `}</style>
+                </span>
               </div>
-              <div className="text-sm font-semibold text-[#E6E7E9]">✓ No issues found</div>
+              <div className="text-sm font-semibold text-[#22c55e]">No issues found</div>
               <div className="text-xs text-[#7A7F86]">Your data looks clean and valid!</div>
               <div className="pt-4 border-t border-[#1C1F22]">
                 <div className="text-xs text-[#5A5F66] font-semibold mb-2">Automatic Analysis:</div>
                 <div className="text-xs text-[#5A5F66] leading-relaxed space-y-1">
-                  <div>✓ Analysis runs automatically on upload</div>
-                  <div>✓ Real-time scanning as you edit</div>
-                  <div>✓ No buttons needed - it just works!</div>
+                  <div>Analysis runs automatically on upload</div>
+                  <div>Real-time scanning as you edit</div>
+                  <div>No buttons needed - it just works!</div>
                 </div>
               </div>
             </div>
@@ -2615,7 +2641,7 @@ const DetectiveD = () => {
                     toast.error('Failed to subscribe', { duration: 3000 });
                   }
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors text-sm"
+                className="px-4 py-2 bg-[#4F7CFF] hover:bg-[#3F6AE0] active:bg-[#3559C7] text-white font-medium rounded transition-colors text-sm"
               >
                 Subscribe
               </button>
@@ -2709,7 +2735,7 @@ const DetectiveD = () => {
                   setFeedbackOptIn(false);
                 }}
                 disabled={!feedbackText.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors text-sm"
+                className="px-4 py-2 bg-[#4F7CFF] hover:bg-[#3F6AE0] active:bg-[#3559C7] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors text-sm"
               >
                 Send Feedback
               </button>
@@ -2824,7 +2850,7 @@ const DetectiveD = () => {
               </button>
               <button
                 onClick={handleConfirmPasteData}
-                className="px-5 py-2 rounded-full bg-blue-600 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-colors"
+                className="px-5 py-2 rounded-full bg-[#4F7CFF] text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-[#3F6AE0] active:bg-[#3559C7] transition-colors"
               >
                 Use this data
               </button>
@@ -2843,7 +2869,7 @@ const DetectiveD = () => {
             <div className="flex justify-end">
               <button
                 onClick={() => setShowFileLimitModal(false)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+                className="px-4 py-2 bg-[#4F7CFF] hover:bg-[#3F6AE0] active:bg-[#3559C7] text-white rounded-lg transition-colors font-medium"
               >
                 OK
               </button>

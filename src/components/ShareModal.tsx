@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Copy, Mail, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { useToast } from '@/contexts/ToastContext';
 
 interface ShareModalProps {
   open: boolean;
@@ -11,6 +11,7 @@ interface ShareModalProps {
 }
 
 export const ShareModal = ({ open, onOpenChange, fileName, issueCount }: ShareModalProps) => {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
 
   const shareText = `Inspect found ${issueCount} issue(s) in ${fileName}. Analyzed with DatumInt's deterministic data quality engine.`;

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useToast } from "@/contexts/ToastContext";
 
 interface FeedbackModalProps {
   open: boolean;
@@ -12,6 +12,7 @@ interface FeedbackModalProps {
 }
 
 export const FeedbackModal = ({ open, onOpenChange }: FeedbackModalProps) => {
+  const toast = useToast();
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

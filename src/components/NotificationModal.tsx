@@ -3,7 +3,7 @@ import { X, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useToast } from "@/contexts/ToastContext";
 
 interface NotificationModalProps {
   open: boolean;
@@ -11,6 +11,7 @@ interface NotificationModalProps {
 }
 
 export function NotificationModal({ open, onOpenChange }: NotificationModalProps) {
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
