@@ -5,3 +5,4 @@ import "./accessibility.css";
 import "./lib/performance";
 
 createRoot(document.getElementById("root")!).render(<App />);
+// Removed HelmetProvider as Seo no longer uses react-helmet-async

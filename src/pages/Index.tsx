@@ -7,11 +7,17 @@ import { WhoIsForSection } from "@/components/WhoIsForSection";
 import { FinalCTASection } from "@/components/FinalCTASection";
 import { Footer } from "@/components/Footer";
 import { ThemeProvider } from "next-themes";
+import { Seo } from "@/components/Seo";
 
 const Index = () => {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="datumint-theme">
       <div className="min-h-screen bg-background overflow-x-hidden max-w-[100vw] flex flex-col">
+        <Seo
+          title="DatumInt — Inspect data files before they break production"
+          description="Catch hidden structural and data quality issues before they break production. Inspect JSON, CSV, XML, and YAML with real-time validation and clear insights."
+          path="/"
+        />
         <Header />
         <HeroSection />
         <WhatBreaksSection />

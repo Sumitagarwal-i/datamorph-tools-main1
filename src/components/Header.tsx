@@ -3,12 +3,14 @@ import { Moon, Sun, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { FeedbackModal } from "./FeedbackModal";
+import { SupportModal } from "./SupportModal";
 import { useNavigate } from "react-router-dom";
 
 export const Header = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleInspectClick = () => {
@@ -23,6 +25,11 @@ export const Header = () => {
 
   const handleFeedbackClick = () => {
     setFeedbackOpen(true);
+    setMobileMenuOpen(false);
+  };
+
+  const handleSupportClick = () => {
+    setSupportOpen(true);
     setMobileMenuOpen(false);
   };
 
@@ -77,6 +84,14 @@ export const Header = () => {
             >
               Feedback
             </button>
+
+            {/* Support */}
+            <button
+              onClick={handleSupportClick}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Support
+            </button>
           </nav>
 
           {/* Mobile - Hamburger Menu */}
@@ -118,6 +133,12 @@ export const Header = () => {
               >
                 Feedback
               </button>
+              <button
+                onClick={handleSupportClick}
+                className="px-4 py-3 text-left text-sm font-normal text-foreground hover:bg-[#F4F4F4] dark:hover:bg-[#1F1F1F] rounded-md transition-colors"
+              >
+                Support
+              </button>
 
               {/* Admin entry removed from home header mobile menu */}
             </nav>
@@ -126,6 +147,7 @@ export const Header = () => {
       </header>
 
       <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
     </>
   );
 };

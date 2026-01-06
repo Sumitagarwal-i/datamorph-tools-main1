@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { X, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Bell, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -24,13 +22,12 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setEmail(value);
-    setErrorMessage(""); // Clear error when user types
+    setErrorMessage("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate email on submit
     const trimmedEmail = email.toLowerCase().trim();
     const isValidEmail = emailRegex.test(trimmedEmail);
     
@@ -45,7 +42,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('notification_subscriptions')
         .insert([
           { 
@@ -56,7 +53,6 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
         .select();
 
       if (error) {
-        // Check for duplicate email
         if (error.code === '23505') {
           setErrorMessage("This email is already subscribed");
         } else {
@@ -65,10 +61,9 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
       } else {
         setIsSuccess(true);
         toast.success("Successfully subscribed!", {
-          description: "We'll notify you when Inspect launches.",
+          description: "We'll notify you about new updates.",
         });
         
-        // Reset form after 2 seconds and close modal
         setTimeout(() => {
           setEmail("");
           setIsSuccess(false);
@@ -87,93 +82,112 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
   };
 
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !isSuccess) {
       setEmail("");
-      setIsSuccess(false);
       setErrorMessage("");
       onOpenChange(false);
     }
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-[90vw] sm:max-w-md mx-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-            <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-            Get Notified
-          </DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            Be the first to know when <span className="text-primary font-semibold">Inspect</span> launches.
-            We'll send you an email notification.
-          </DialogDescription>
-        </DialogHeader>
-        
-        {!isSuccess ? (
-          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 pt-3 sm:pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium dark:text-foreground light:text-slate-900">
-                Email Address
-              </Label>
-              <div className="relative">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl max-w-md w-full border border-[#EAEAEA] dark:border-[#2E2E2E]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[#EAEAEA] dark:border-[#2E2E2E]">
+          <h2 className="text-lg font-semibold text-[#1A1A1A] dark:text-[#E8E8E8]">
+            Stay connected
+          </h2>
+          <button
+            onClick={handleClose}
+            disabled={isSubmitting || isSuccess}
+            className="text-[#666666] dark:text-[#999999] hover:text-[#1A1A1A] dark:hover:text-[#E8E8E8] transition-colors disabled:opacity-50"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {!isSuccess ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Description */}
+              <p className="text-sm text-[#666666] dark:text-[#999999]">
+                Be the first to know about new features, updates, and tips for using DatumInt.
+              </p>
+
+              {/* Email Input */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[#1A1A1A] dark:text-[#E8E8E8]">
+                  Email address
+                </label>
                 <Input
-                  id="email"
                   type="email"
-                  placeholder="your.email@example.com"
+                  placeholder="your@email.com"
                   value={email}
                   onChange={handleEmailChange}
-                  className={`dark:bg-background dark:text-foreground light:bg-white light:text-slate-900 ${
-                    errorMessage 
-                      ? 'border-red-500 focus-visible:ring-red-500 dark:border-red-500 light:border-red-600'
-                      : 'dark:border-border light:border-slate-300'
-                  }`}
                   disabled={isSubmitting}
+                  className={`bg-[#F5F5F5] dark:bg-[#0F0F0F] text-[#1A1A1A] dark:text-[#E8E8E8] placeholder:text-[#999999] dark:placeholder:text-[#666666] ${
+                    errorMessage 
+                      ? "border-red-500 dark:border-red-500" 
+                      : "border-[#EAEAEA] dark:border-[#2E2E2E]"
+                  }`}
                   autoFocus
                 />
-              </div>
-              {errorMessage && (
-                <p className="text-xs sm:text-sm text-red-500 dark:text-red-400 light:text-red-600">{errorMessage}</p>
-              )}
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={isSubmitting}
-                className="flex-1 order-2 sm:order-1 dark:border-border dark:text-foreground light:border-slate-300 light:text-slate-900"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={!email.trim() || isSubmitting}
-                className="flex-1 order-1 sm:order-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    <span className="text-sm sm:text-base">Subscribing...</span>
-                  </>
-                ) : (
-                  <span className="text-sm sm:text-base">Subscribe</span>
+                {errorMessage && (
+                  <p className="text-xs text-red-500 dark:text-red-400">{errorMessage}</p>
                 )}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <div className="py-6 sm:py-8 text-center space-y-3 sm:space-y-4">
-            <CheckCircle2 className="h-12 w-12 sm:h-16 sm:w-16 text-green-500 dark:text-green-500 light:text-green-600 mx-auto" />
-            <div>
-              <h3 className="text-base sm:text-lg font-semibold mb-1 dark:text-foreground light:text-slate-900">You're all set!</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground light:text-slate-600">
-                We'll notify you when Inspect is ready.
+              </div>
+
+              {/* Reassurance Text */}
+              <p className="text-xs text-[#999999] dark:text-[#666666]">
+                We respect your inbox — unsubscribe anytime.
               </p>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                  className="flex-1 border-[#EAEAEA] dark:border-[#2E2E2E] text-[#1A1A1A] dark:text-[#E8E8E8]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!email.trim() || isSubmitting}
+                  className="flex-1 bg-[#0066CC] hover:bg-[#0052A3] text-white"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Subscribing...
+                    </>
+                  ) : (
+                    "Subscribe"
+                  )}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            /* Success State */
+            <div className="py-6 text-center space-y-4">
+              <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-500 mx-auto" />
+              <div>
+                <h3 className="text-base font-semibold text-[#1A1A1A] dark:text-[#E8E8E8] mb-1">
+                  You're all set!
+                </h3>
+                <p className="text-sm text-[#666666] dark:text-[#999999]">
+                  We'll keep you updated on what's new.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

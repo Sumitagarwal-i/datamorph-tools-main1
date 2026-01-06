@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { BLOG_CATEGORIES, getPublicUrl } from "@/lib/blog";
 import { Button } from "@/components/ui/button";
+import { Seo } from "@/components/Seo";
 
 type BlogRow = Tables<"blogs">;
 
@@ -112,8 +113,12 @@ const Blog = () => {
     ? filteredPosts.filter((p) => p.slug !== featuredPost.slug)
     : [];
 
+  const seoDescription =
+    "Guides and practical notes on data quality, schema drift, and file-level errors that silently break pipelines.";
+
   return (
     <div className="min-h-screen bg-white dark:bg-[#0B0B0B] flex flex-col">
+      <Seo title="Blog | DatumInt" description={seoDescription} path="/blog" />
       <BlogHeader />
 
       <main className="flex-grow container max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">

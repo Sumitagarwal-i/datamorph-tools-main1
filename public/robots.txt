@@ -1,16 +1,12 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
 
-Sitemap: https://datumint.vercel.app/sitemap.xml
+# Block app-internal routes (thin / non-marketing content)
+Disallow: /inspect
+Disallow: /detective-d
+Disallow: /dashboard
+Disallow: /upload
+Disallow: /api
+Disallow: /admin
+
+Sitemap: https://www.datumintapp.com/sitemap.xml

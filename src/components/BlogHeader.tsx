@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FeedbackModal } from "./FeedbackModal";
+import { SupportModal } from "./SupportModal";
 import { MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ export const BlogHeader = () => {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -66,6 +68,13 @@ export const BlogHeader = () => {
               Feedback
             </button>
 
+            <button
+              onClick={() => setSupportOpen(true)}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Support
+            </button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -84,6 +93,7 @@ export const BlogHeader = () => {
       </header>
 
       <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} topic="Blog" />
     </>
   );
 };

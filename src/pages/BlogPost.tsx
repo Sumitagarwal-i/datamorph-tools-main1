@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { isAdminAuthed } from "@/lib/adminAuth";
 import { getPublicUrl } from "@/lib/blog";
+import { Seo } from "@/components/Seo";
 
 type BlogRow = Tables<"blogs">;
 
@@ -135,6 +136,11 @@ const BlogPost = () => {
   if (!loading && notFound) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <Seo
+          title="Post not found | DatumInt"
+          description="This article could not be found. Explore the latest posts on data quality and file-level validation."
+          path="/blog"
+        />
         <BlogHeader />
         <div className="flex-grow flex items-center justify-center">
           <div className="text-center">
@@ -155,6 +161,11 @@ const BlogPost = () => {
   if (loading || !post) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <Seo
+          title="Loading… | DatumInt"
+          description="Loading the article."
+          path={slug ? `/blog/${slug}` : "/blog"}
+        />
         <BlogHeader />
         <div className="flex-grow flex items-center justify-center text-muted-foreground">Loading…</div>
         <Footer />
@@ -164,6 +175,11 @@ const BlogPost = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <Seo
+        title={`${post.title} | DatumInt`}
+        description={post.description}
+        path={`/blog/${post.slug}`}
+      />
       <BlogHeader />
 
       <article

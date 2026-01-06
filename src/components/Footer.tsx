@@ -1,12 +1,13 @@
-
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ContactModal } from "./ContactModal";
+import { SupportModal } from "./SupportModal";
 
 
 export const Footer = () => {
   const navigate = useNavigate();
   const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   return (
     <footer className="border-t border-[#EAEAEA] dark:border-[#1E1E1E] py-8 sm:py-12 bg-white dark:bg-[#0F0F0F]">
@@ -74,6 +75,15 @@ export const Footer = () => {
                   Contact
                 </button>
               </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setSupportOpen(true)}
+                  className="text-sm text-[#6B6B6B] dark:text-[#A8A8A8] hover:text-[#1A1A1A] dark:hover:text-[#E8E8E8] transition-colors"
+                >
+                  Support
+                </button>
+              </li>
             </ul>
           </div>
         </div>
@@ -89,6 +99,7 @@ export const Footer = () => {
         </div>
       </div>
       <ContactModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
+      <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
     </footer>
   );
 };
