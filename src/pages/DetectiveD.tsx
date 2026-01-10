@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Upload, ClipboardPaste, RotateCcw, Moon, Sun, HelpCircle, X, Check, Plus, FileJson, FileText, FileCode, CircleAlert, TriangleAlert, Download, Wand2, Minimize2, Table, AlignLeft, Zap, ExternalLink, FileDown, Share2, Shield, Bell, MessageSquare, AlertCircle, Info } from "lucide-react";
 import { HelpCenterModal } from "@/components/HelpCenterModal";
 import { DetectiveDExplainerModal } from "@/components/DetectiveDExplainerModal";
@@ -122,8 +122,10 @@ const defineCustomTheme = (monaco: any) => {
 
 const DetectiveD = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const { theme, setTheme } = useTheme();
+  const didHandlePreloadRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
@@ -244,6 +246,25 @@ const DetectiveD = () => {
       duration: 3000,
     });
   };
+
+  type InspectPreloadState = {
+    inspectPreload?: {
+      name: string;
+      content: string;
+      source?: 'upload' | 'paste';
+    };
+  };
+
+  useEffect(() => {
+    if (didHandlePreloadRef.current) return;
+
+    const preload = (location.state as InspectPreloadState | null | undefined)?.inspectPreload;
+    if (!preload?.name || !preload?.content) return;
+
+    didHandlePreloadRef.current = true;
+    addVirtualFile(preload.name, preload.content, preload.source ?? 'paste');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const guessPastedFileName = (raw: string) => {
     const text = raw.trimStart();

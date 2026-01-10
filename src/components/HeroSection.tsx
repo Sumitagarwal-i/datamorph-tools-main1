@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { useParallax } from "@/hooks/useParallax";
+import { InspectEntryPanel } from "@/components/InspectEntryPanel";
 
 export const HeroSection = () => {
   const navigate = useNavigate();
@@ -82,16 +83,12 @@ export const HeroSection = () => {
             </div>
           </div>
 
-          {/* Right Column - Visual Illustration */}
-          <div className="hidden lg:flex justify-center items-center h-full">
-            <img
-              src="/perfect_hero.webp"
-              alt="DatumInt file inspection illustration"
-              decoding="async"
-              fetchPriority="high"
-              className="w-full h-full object-contain"
-              draggable="false"
-            />
+          {/* Right Column - Interactive Inspect Preview */}
+          <div className="flex flex-col justify-center items-center h-full">
+            <div className="text-xs text-[#6B6B6B] dark:text-[#8B8B8B] mb-4">
+              Inspect directly by inserting data here
+            </div>
+            <InspectEntryPanel />
           </div>
 
         </div>
