@@ -5,6 +5,7 @@ import { DetectiveDExplainerModal } from "@/components/DetectiveDExplainerModal"
 import { ShareModal } from "@/components/ShareModal";
 import { AuditLogModal } from "@/components/AuditLogModal";
 import { ExportModal } from "@/components/ExportModal";
+import { DetectiveEntryAnimation } from "@/components/DetectiveEntryAnimation";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { trackEvent } from "@/hooks/useTelemetry";
 import { FeedbackPopup } from '@/components/FeedbackPopup';
@@ -151,6 +152,7 @@ const DetectiveD = () => {
   const [viewMode, setViewMode] = useState<'text' | 'table'>('text');
   const [helpCenterOpen, setHelpCenterOpen] = useState(false);
   const [showExplainerModal, setShowExplainerModal] = useState(true);
+  const [showEntryAnimation, setShowEntryAnimation] = useState(true);
   
   // Edit mode: track if user is editing after analysis (shows cancel/confirm buttons)
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1518,6 +1520,9 @@ const DetectiveD = () => {
 
   return (
     <div className="fixed inset-0 bg-[#0d0f13] text-slate-200 flex flex-col overflow-hidden inspect-slide-in">
+      {showEntryAnimation && (
+        <DetectiveEntryAnimation onComplete={() => setShowEntryAnimation(false)} />
+      )}
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
