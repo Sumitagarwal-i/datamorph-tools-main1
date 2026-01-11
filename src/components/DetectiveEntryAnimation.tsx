@@ -82,7 +82,7 @@ export function DetectiveEntryAnimation({ onComplete }: DetectiveEntryAnimationP
         {/* Text */}
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            DETECTIVE D
+            INSPECT
           </h2>
           <p className="text-sm text-gray-400 tracking-widest uppercase text-[10px] h-4">
             {stage === "initial" && "Initializing..."}
